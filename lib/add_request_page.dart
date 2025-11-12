@@ -19,6 +19,7 @@ class Stop {
   final TextEditingController warehouseController;
   double? lat;
   double? lng;
+  int? cityId; // дополнительное поле для надёжного сравнения
 
   Stop({
     this.city,
@@ -26,6 +27,7 @@ class Stop {
     required this.warehouseController,
     this.lat,
     this.lng,
+    this.cityId,
   });
 }
 
@@ -55,6 +57,9 @@ class _AddRequestPageState extends State<AddRequestPage> {
   late Future<List<TransportCategory>> _transportCategoriesFuture;
   late Future<List<City>> _citiesFuture;
   String? _distanceKm;
+
+  // Сохраняем локально список, чтобы быстро искать по id
+  List<City> _citiesCache = [];
 
   @override
   void initState() {
@@ -138,12 +143,17 @@ class _AddRequestPageState extends State<AddRequestPage> {
   }
 
   Future<void> _geocodeCityCenter(Stop stop) async {
-    if (stop.city == null) return;
+    if (stop.city == null && stop.cityId == null) return;
 
-    final cityName = stop.city!.name;
+    final cityName = stop.city?.name ??
+        _citiesCache
+            .firstWhere((c) => c.id == stop.cityId,
+                orElse: () => City(id: 0, name: ''))
+            .name;
+    if (cityName.isEmpty) return;
+
     final viewbox = '67.3,41.1,75.2,36.7'; // Сарҳади Тоҷикистон
 
-    // ПАРАМЕТРИ НАВ: &countrycodes=tj
     final url = Uri.parse(
         'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(cityName)}&format=json&limit=1&viewbox=$viewbox&bounded=1&countrycodes=tj');
 
@@ -169,14 +179,17 @@ class _AddRequestPageState extends State<AddRequestPage> {
     }
   }
 
-  // Функсияи асосии навшуда
   Future<void> _geocodeAddress(Stop stop) async {
-    if (stop.addressController.text.isEmpty || stop.city == null) return;
+    final cityName = stop.city?.name ??
+        _citiesCache
+            .firstWhere((c) => c.id == stop.cityId,
+                orElse: () => City(id: 0, name: ''))
+            .name;
+    if (stop.addressController.text.isEmpty || cityName.isEmpty) return;
 
-    final fullAddress = "${stop.city!.name}, ${stop.addressController.text}";
+    final fullAddress = "$cityName, ${stop.addressController.text}";
     final viewbox = '67.3,41.1,75.2,36.7';
 
-    // ПАРАМЕТРИ НАВ: &countrycodes=tj
     final url = Uri.parse(
         'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(fullAddress)}&format=json&limit=1&viewbox=$viewbox&bounded=1&countrycodes=tj');
 
@@ -230,14 +243,10 @@ class _AddRequestPageState extends State<AddRequestPage> {
   }
 
   Future<void> _calculateDistance() async {
-    // Ҳамаи нуқтаҳоро дар як рӯйхат ҷамъ мекунем: аввал "Откуда", баъд "Куда"
     final allStops = [..._originStops, ..._destinationStops];
-
-    // Нуқтаҳоеро, ки координата надоранд, филтр мекунем
     final pointsWithCoords =
         allStops.where((stop) => stop.lat != null && stop.lng != null).toList();
 
-    // Агар камтар аз 2 нуқта бо координата вуҷуд дошта бошад, ҳисоб намекунем
     if (pointsWithCoords.length < 2) {
       setState(() {
         _distanceKm = null;
@@ -245,7 +254,6 @@ class _AddRequestPageState extends State<AddRequestPage> {
       return;
     }
 
-    // Сатри URL-ро барои OSRM бо ҳамаи нуқтаҳо месозем
     final waypoints =
         pointsWithCoords.map((stop) => '${stop.lng},${stop.lat}').join(';');
     final url =
@@ -256,7 +264,6 @@ class _AddRequestPageState extends State<AddRequestPage> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
-          // OSRM масофаи умумии маршрутро бармегардонад
           final distanceMeters = data['routes'][0]['distance'];
           if (mounted) {
             setState(() {
@@ -275,7 +282,7 @@ class _AddRequestPageState extends State<AddRequestPage> {
   Future<void> _showMapDialog(Stop stop) async {
     final LatLng initialPoint = stop.lat != null && stop.lng != null
         ? LatLng(stop.lat!, stop.lng!)
-        : const LatLng(38.8, 71.2); // Нуқтаи ибтидоӣ
+        : const LatLng(38.8, 71.2);
 
     final result = await showDialog<Map<String, double>>(
       context: context,
@@ -291,7 +298,6 @@ class _AddRequestPageState extends State<AddRequestPage> {
     }
   }
 
-  // Фиристодани дархост ба сервер
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) {
       _showErrorSnackBar('Пожалуйста, заполните все обязательные поля.');
@@ -304,8 +310,6 @@ class _AddRequestPageState extends State<AddRequestPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    // === ҚИСМИ ИСЛОҲШУДА: АДРЕСҲОРО БЕ НОМИ ШАҲР МЕФИРИСТЕМ ===
-    // Чунки акнун ID-и ҳар як шаҳрро алоҳида мефиристем, номи шаҳр дар ин сатр лозим нест.
     final String allOriginAddresses =
         _originStops.map((stop) => stop.addressController.text).join(';');
     final String allOriginWarehouses =
@@ -327,13 +331,11 @@ class _AddRequestPageState extends State<AddRequestPage> {
       'transport': _selectedTransport?.id,
       'load_date': _loadDate?.toIso8601String().substring(0, 10),
       'delivery_date': _deliveryDate?.toIso8601String().substring(0, 10),
-
-      // === ҚИСМИ МУҲИМИ ИСЛОҲШУДА ===
-      // Ба ҷои ID-и як шаҳр, рӯйхати ID-ҳои ҲАМАИ шаҳрҳоро мефиристем
-      'origin_cities': _originStops.map((stop) => stop.city?.id).toList(),
-      'dest_cities': _destinationStops.map((stop) => stop.city?.id).toList(),
-      // ================================
-
+      'origin_cities':
+          _originStops.map((stop) => stop.city?.id ?? stop.cityId).toList(),
+      'dest_cities': _destinationStops
+          .map((stop) => stop.city?.id ?? stop.cityId)
+          .toList(),
       'origin_address': allOriginAddresses,
       'origin_warehouse': allOriginWarehouses,
       'dest_address': allDestAddresses,
@@ -377,40 +379,66 @@ class _AddRequestPageState extends State<AddRequestPage> {
     }
   }
 
-  // Функсияи умумӣ барои гирифтани маълумот аз API
   Future<List<dynamic>> _fetchPaginatedData(String urlString) async {
-    final url = Uri.parse(urlString);
-    final response = await http.get(url);
-    if (response.statusCode == 200) {
+    List<dynamic> all = [];
+    String? next = urlString;
+
+    while (next != null) {
+      final url = Uri.parse(next);
+      final response = await http.get(url);
+      if (response.statusCode != 200) {
+        throw Exception('Не удалось загрузить данные: ${response.statusCode}');
+      }
+
       final decodedData = json.decode(utf8.decode(response.bodyBytes));
-      if (decodedData is Map<String, dynamic> &&
-          decodedData.containsKey('results')) {
-        return decodedData['results'];
+      if (decodedData is Map<String, dynamic>) {
+        // Если API возвращает пагинацию
+        if (decodedData.containsKey('results')) {
+          final results = decodedData['results'] as List<dynamic>;
+          all.addAll(results);
+          // следующий URL может быть абсолютным
+          next = (decodedData['next'] != null &&
+                  decodedData['next'].toString().isNotEmpty)
+              ? decodedData['next'].toString()
+              : null;
+        } else {
+          // Непагинированный объект — пробуем найти вложенный список
+          bool found = false;
+          decodedData.forEach((k, v) {
+            if (!found && v is List) {
+              all.addAll(v);
+              found = true;
+            }
+          });
+          if (!found) throw Exception('Неизвестный формат JSON');
+          next = null;
+        }
       } else if (decodedData is List) {
-        return decodedData;
+        all.addAll(decodedData);
+        next = null;
       } else {
         throw Exception('Неизвестный формат JSON');
       }
-    } else {
-      throw Exception('Не удалось загрузить данные');
     }
+
+    return all;
   }
 
-  // Гирифтани рӯйхати категорияҳои транспорт
   Future<List<TransportCategory>> _fetchTransportCategories() async {
     final data = await _fetchPaginatedData(
         'https://app.payvandtrans.com/api/transports/');
     return data.map((json) => TransportCategory.fromJson(json)).toList();
   }
 
-  // Гирифтани рӯйхати шаҳрҳо
   Future<List<City>> _fetchCities() async {
     final data =
         await _fetchPaginatedData('https://app.payvandtrans.com/api/cities/');
-    return data.map((json) => City.fromJson(json)).toList();
+    final list = data.map((json) => City.fromJson(json)).toList();
+    // Обновляем локальный кеш для поиска по id
+    _citiesCache = list;
+    return list;
   }
 
-  // Интихоби сана
   Future<void> _selectDate(BuildContext context, bool isLoadDate) async {
     final DateTime? picked = await showDatePicker(
         context: context,
@@ -533,8 +561,6 @@ class _AddRequestPageState extends State<AddRequestPage> {
                         icon:
                             const Icon(Icons.map_outlined, color: Colors.green),
                         onPressed: () {
-                          // === КОДИ НАВ САР МЕШАВАД ===
-                          // Маълумоти муваққатиро ба намуди лозима мегардонем
                           final List<OriginStop> originStopsForMap =
                               _originStops
                                   .map((s) => OriginStop(
@@ -566,7 +592,6 @@ class _AddRequestPageState extends State<AddRequestPage> {
                               ),
                             ),
                           );
-                          // === КОДИ НАВ ДАР ҲАМИН ҶО ТАМОМ МЕШАВАД ===
                         },
                       )
                     ],
@@ -639,8 +664,6 @@ class _AddRequestPageState extends State<AddRequestPage> {
     );
   }
 
-  // === ВИҶЕТҲОИ ЁРИРАСОН ===
-
   Widget _buildStopInputWidget(Stop stop, int index, {required bool isOrigin}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -651,14 +674,22 @@ class _AddRequestPageState extends State<AddRequestPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Передаём future и текущий Stop (чтобы корректно выбрать элемент по id)
                 _buildDropdown<City>(
                   future: _citiesFuture,
                   hint: 'Город',
                   value: stop.city,
                   onChanged: (item) {
-                    setState(() => stop.city = item);
+                    // При выборе сохраняем и объект и id
+                    setState(() {
+                      stop.city = item;
+                      stop.cityId = item?.id;
+                    });
                     if (stop.addressController.text.isNotEmpty) {
                       _geocodeAddress(stop);
+                    } else {
+                      // если адрес пуст — попытка получить центр города
+                      _geocodeCityCenter(stop);
                     }
                   },
                   itemBuilder: (item) =>
@@ -848,8 +879,23 @@ class _AddRequestPageState extends State<AddRequestPage> {
               style: const TextStyle(color: Colors.red));
         }
         final items = snapshot.data ?? [];
+
+        // Надёжно определяем выбранный элемент по id (если value - объект другого инстанса)
+        T? selected;
+        try {
+          if (value != null) {
+            final dynamic v = value as dynamic;
+            final dynamic vid = (v is int || v is String) ? v : (v.id ?? v);
+            selected = items.firstWhere(
+                (it) => (it as dynamic).id.toString() == vid.toString(),
+                orElse: () => null as T);
+          }
+        } catch (_) {
+          selected = null;
+        }
+
         return DropdownButtonFormField<T>(
-          value: value,
+          value: selected,
           onChanged: (val) => onChanged(val),
           hint: Text(hint, style: const TextStyle(color: Colors.white54)),
           dropdownColor: const Color(0xFF333333),
