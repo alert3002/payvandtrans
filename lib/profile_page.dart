@@ -8,10 +8,10 @@ import 'package:intl/intl.dart';
 import 'transport_page.dart';
 import 'balance_page.dart';
 import 'auth_screen.dart';
-import 'models/city_model.dart'; // Боварӣ ҳосил кунед, ки ин файл вуҷуд дорад
+import 'models/city_model.dart'; // Убедитесь, что этот файл есть и класс City реализован
 
 // =======================================================================
-// Саҳифаи асосии "Настройки"
+// ProfilePage
 // =======================================================================
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -26,7 +26,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _userRole;
   String? _balance;
   String? _photoUrl;
-  int? _userId; // Барои нигоҳ доштани ID-и корбар
+  int? _userId;
 
   @override
   void initState() {
@@ -59,10 +59,9 @@ class _ProfilePageState extends State<ProfilePage> {
           _fullName = data['user']?['full_name'] ?? 'Имя не указано';
           _phone = data['user']?['phone'] ?? '';
           _photoUrl = data['photo'];
-          _userId = data['user']?['id']; // ID-и корбарро захира мекунем
-
+          _userId = data['user']?['id'];
           if (_userRole == 'driver' && data['balance'] != null) {
-            _balance = data['balance'];
+            _balance = data['balance'].toString();
           }
         });
       }
@@ -78,7 +77,6 @@ class _ProfilePageState extends State<ProfilePage> {
   void _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const AuthScreen()),
@@ -131,7 +129,7 @@ class _ProfilePageState extends State<ProfilePage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Қисми болоии профил
+            // профильный блок
             Container(
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
@@ -182,7 +180,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 24),
 
-            // 1. Профиль
             _buildMenuItem(
               icon: Icons.person_outline,
               text: 'Профиль',
@@ -197,7 +194,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
             const SizedBox(height: 16),
 
-            // 2. БЛОКИ АМАЛҲОИ РОНАНДА
             if (isDriver) ...[
               _buildMenuItem(
                 icon: Icons.directions_car,
@@ -221,8 +217,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // ТУГМАИ "ОТЗЫВЫ"
               _buildMenuItem(
                 icon: Icons.reviews,
                 text: 'Отзывы',
@@ -245,7 +239,6 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
             ],
 
-            // 3. Выйти
             _buildMenuItem(
               icon: Icons.exit_to_app,
               text: 'Выйти',
@@ -259,9 +252,8 @@ class _ProfilePageState extends State<ProfilePage> {
 }
 
 // =======================================================================
-// Саҳифаи Таҳрири Профил (EditProfilePage)
+// EditProfilePage (с кнопкой Save + Delete)
 // =======================================================================
-
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
   @override
@@ -293,6 +285,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
   void initState() {
     super.initState();
     _loadProfileData();
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _passportController.dispose();
+    _innController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfileData() async {
@@ -491,24 +491,61 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       Center(
                           child: _buildImagePicker('Клиент', _photoFile,
                               _photoUrl, (file) => _photoFile = file)),
-                    const SizedBox(height: 40),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _saveProfile,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFdcd232),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                    const SizedBox(height: 24),
+
+                    // Row with Save + Delete
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: _saveProfile,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFdcd232),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Сохранить',
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+                          ),
                         ),
-                        child: const Text('Сохранить',
-                            style: TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
-                      ),
-                    )
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 1,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const DeleteAccountPage()),
+                              ).then((deleted) {
+                                if (deleted == true) {
+                                  Navigator.of(context).pushAndRemoveUntil(
+                                      MaterialPageRoute(
+                                          builder: (_) => const AuthScreen()),
+                                      (route) => false);
+                                }
+                              });
+                            },
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.red),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('Удалить',
+                                style: TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -546,130 +583,325 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget _buildCityDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Город', style: TextStyle(color: Colors.white70)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<City>(
-            value: _selectedCity,
-            items: _cities.map((city) {
-              return DropdownMenuItem<City>(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Город', style: TextStyle(color: Colors.white70)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<City>(
+          value: _selectedCity,
+          items: _cities.map((city) {
+            return DropdownMenuItem<City>(
                 value: city,
                 child: Text(city.name,
-                    style: const TextStyle(color: Colors.white)),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedCity = value;
-              });
-            },
-            decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFF3d3e42),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
-                hintText: 'Выбрать город',
-                hintStyle: const TextStyle(color: Colors.white54)),
-            dropdownColor: const Color(0xFF3d3e42),
-            style: const TextStyle(color: Colors.white),
-          ),
-        ],
-      ),
+                    style: const TextStyle(color: Colors.white)));
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedCity = value;
+            });
+          },
+          decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFF3d3e42),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none),
+              hintText: 'Выбрать город',
+              hintStyle: const TextStyle(color: Colors.white54)),
+          dropdownColor: const Color(0xFF3d3e42),
+          style: const TextStyle(color: Colors.white),
+        ),
+      ]),
     );
   }
 
   Widget _buildDatePicker() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Дата рождения', style: TextStyle(color: Colors.white70)),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () async {
-              final DateTime? picked = await showDatePicker(
-                context: context,
-                initialDate: _birthDate ?? DateTime.now(),
-                firstDate: DateTime(1950),
-                lastDate: DateTime.now(),
-              );
-              if (picked != null && picked != _birthDate) {
-                setState(() {
-                  _birthDate = picked;
-                });
-              }
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                  color: const Color(0xFF3d3e42),
-                  borderRadius: BorderRadius.circular(12)),
-              child: Text(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Дата рождения', style: TextStyle(color: Colors.white70)),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: _birthDate ?? DateTime.now(),
+              firstDate: DateTime(1950),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null && picked != _birthDate) {
+              setState(() {
+                _birthDate = picked;
+              });
+            }
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+                color: const Color(0xFF3d3e42),
+                borderRadius: BorderRadius.circular(12)),
+            child: Text(
                 _birthDate == null
                     ? 'Выбрать дату'
                     : DateFormat('dd.MM.yyyy').format(_birthDate!),
                 style: TextStyle(
                     color: _birthDate == null ? Colors.white54 : Colors.white,
-                    fontSize: 16),
-              ),
-            ),
+                    fontSize: 16)),
           ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 
   Widget _buildImagePicker(String label, File? imageFile, String? imageUrl,
       Function(File) onImagePicked) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => _pickImage(ImageSource.gallery, onImagePicked),
-          child: Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: const Color(0xFF3d3e42),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white24),
-              image: imageFile != null
-                  ? DecorationImage(
-                      image: FileImage(imageFile), fit: BoxFit.cover)
-                  : (imageUrl != null && imageUrl.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(imageUrl), fit: BoxFit.cover)
-                      : null),
-            ),
-            child: (imageFile == null && (imageUrl == null || imageUrl.isEmpty))
-                ? const Icon(Icons.add_a_photo, color: Colors.white70, size: 40)
-                : null,
+    return Column(children: [
+      GestureDetector(
+        onTap: () => _pickImage(ImageSource.gallery, onImagePicked),
+        child: Container(
+          width: 100,
+          height: 100,
+          decoration: BoxDecoration(
+            color: const Color(0xFF3d3e42),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white24),
+            image: imageFile != null
+                ? DecorationImage(
+                    image: FileImage(imageFile), fit: BoxFit.cover)
+                : (imageUrl != null && imageUrl.isNotEmpty
+                    ? DecorationImage(
+                        image: NetworkImage(imageUrl), fit: BoxFit.cover)
+                    : null),
           ),
+          child: (imageFile == null && (imageUrl == null || imageUrl.isEmpty))
+              ? const Icon(Icons.add_a_photo, color: Colors.white70, size: 40)
+              : null,
         ),
-        const SizedBox(height: 8),
-        Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 12)),
-      ],
+      ),
+      const SizedBox(height: 8),
+      Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+    ]);
+  }
+}
+
+// =======================================================================
+// DeleteAccountPage
+// =======================================================================
+class DeleteAccountPage extends StatefulWidget {
+  const DeleteAccountPage({super.key});
+
+  @override
+  State<DeleteAccountPage> createState() => _DeleteAccountPageState();
+}
+
+class _DeleteAccountPageState extends State<DeleteAccountPage> {
+  final List<String> _reasons = [
+    'Не нужен сервис',
+    'Проблемы с работой приложения',
+    'Нашёл другое приложение',
+    'Другое'
+  ];
+  String _selectedReason = 'Не нужен сервис';
+  final TextEditingController _otherController = TextEditingController();
+  bool _confirm = false;
+  bool _isProcessing = false;
+
+  @override
+  void dispose() {
+    _otherController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _performDelete() async {
+    if (!_confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Подтвердите удаление аккаунта.')));
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка: токен не найден.')));
+      return;
+    }
+
+    final reason = _selectedReason == 'Другое'
+        ? (_otherController.text.trim().isEmpty
+            ? 'Другое'
+            : _otherController.text.trim())
+        : _selectedReason;
+
+    try {
+      // Измените этот URI если ваш backend использует другой путь для удаления
+      final deleteUri = Uri.parse('https://app.payvandtrans.com/api/me/');
+
+      final resp = await http.delete(
+        deleteUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'reason': reason}),
+      );
+
+      if (resp.statusCode == 200 || resp.statusCode == 204) {
+        await prefs.clear();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Аккаунт успешно удалён.'),
+            backgroundColor: Colors.green,
+          ));
+          Navigator.of(context).pop(true);
+        }
+      } else {
+        // Возможный fallback: попробуем другой endpoint (например users/me)
+        final fallbackUri =
+            Uri.parse('https://app.payvandtrans.com/api/users/me/');
+        final resp2 = await http.delete(
+          fallbackUri,
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({'reason': reason}),
+        );
+
+        if (resp2.statusCode == 200 || resp2.statusCode == 204) {
+          await prefs.clear();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Аккаунт успешно удалён.'),
+              backgroundColor: Colors.green,
+            ));
+            Navigator.of(context).pop(true);
+          }
+        } else {
+          final message = 'Ошибка удаления: ${resp.statusCode}. ${resp.body}';
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(message), backgroundColor: Colors.red));
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF2e2f34),
+      appBar: AppBar(
+        title: const Text('Удаление аккаунта',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF2e2f34),
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Причина удаления',
+              style: TextStyle(color: Colors.white70)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+                color: const Color(0xFF3d3e42),
+                borderRadius: BorderRadius.circular(12)),
+            child: DropdownButton<String>(
+              value: _selectedReason,
+              isExpanded: true,
+              dropdownColor: const Color(0xFF3d3e42),
+              underline: const SizedBox(),
+              iconEnabledColor: Colors.white,
+              items: _reasons
+                  .map((r) => DropdownMenuItem(
+                      value: r,
+                      child:
+                          Text(r, style: const TextStyle(color: Colors.white))))
+                  .toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() {
+                  _selectedReason = v;
+                });
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_selectedReason == 'Другое') ...[
+            const Text('Уточните причину',
+                style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _otherController,
+              maxLines: 3,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Опишите причину',
+                hintStyle: const TextStyle(color: Colors.white54),
+                filled: true,
+                fillColor: const Color(0xFF3d3e42),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(children: [
+            Checkbox(
+                value: _confirm,
+                activeColor: const Color(0xFFdcd232),
+                onChanged: (v) => setState(() => _confirm = v ?? false)),
+            const Expanded(
+                child: Text(
+                    'Я подтверждаю, что хочу удалить свой аккаунт и понимаю, что данные будут удалены.',
+                    style: TextStyle(color: Colors.white70))),
+          ]),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isProcessing ? null : _performDelete,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              child: _isProcessing
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Text('Удалить аккаунт',
+                      style: TextStyle(color: Colors.white, fontSize: 16)),
+            ),
+          )
+        ]),
+      ),
     );
   }
 }
 
 // =======================================================================
-// Саҳифаи Рӯйхати Отзывҳо (ReviewListPage)
+// ReviewListPage (тот же, что был)
 // =======================================================================
-
 class ReviewListPage extends StatefulWidget {
   final int driverId;
-
-  const ReviewListPage({
-    super.key,
-    required this.driverId,
-  });
-
+  const ReviewListPage({super.key, required this.driverId});
   @override
   State<ReviewListPage> createState() => _ReviewListPageState();
 }
@@ -715,7 +947,6 @@ class _ReviewListPageState extends State<ReviewListPage> {
       if (mounted) {
         if (response.statusCode == 200) {
           final decodedData = json.decode(utf8.decode(response.bodyBytes));
-
           if (decodedData is Map<String, dynamic> &&
               decodedData.containsKey('results')) {
             final List<dynamic> reviewsJson = decodedData['results'];
@@ -724,7 +955,6 @@ class _ReviewListPageState extends State<ReviewListPage> {
               _isLoading = false;
             });
           } else if (decodedData is List) {
-            // Агар ҷавоб бе пагинация ояд
             final List<dynamic> reviewsJson = decodedData;
             setState(() {
               _reviews = reviewsJson;
@@ -732,7 +962,7 @@ class _ReviewListPageState extends State<ReviewListPage> {
             });
           } else {
             setState(() {
-              _errorMessage = 'Ошибка: Формати нодурусти маълумот аз сервер.';
+              _errorMessage = 'Ошибка: Формат нодурусти маълумот аз сервер.';
               _isLoading = false;
             });
           }
@@ -754,14 +984,11 @@ class _ReviewListPageState extends State<ReviewListPage> {
     }
   }
 
-  // ❗️ ФУНКСИЯИ ЁРИРАСОНИ НАВ БАРОИ САНА
   DateTime? _tryParseDate(String dateString) {
     try {
-      // Аввал кӯшиш мекунем, ки формати стандартиро коркард кунем
       return DateTime.parse(dateString);
     } catch (e) {
-      // Агар хато шавад, ба консол менависем ва null бармегардонем
-      print('Could not parse date in standard format: $dateString');
+      print('Could not parse date: $dateString');
       return null;
     }
   }
@@ -776,9 +1003,8 @@ class _ReviewListPageState extends State<ReviewListPage> {
         backgroundColor: const Color(0xFF2e2f34),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop()),
       ),
       body: _buildBody(),
     );
@@ -792,24 +1018,17 @@ class _ReviewListPageState extends State<ReviewListPage> {
 
     if (_errorMessage != null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _errorMessage!,
-            style: const TextStyle(color: Colors.red, fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
+          child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(_errorMessage!,
+                  style: const TextStyle(color: Colors.red, fontSize: 16),
+                  textAlign: TextAlign.center)));
     }
 
     if (_reviews.isEmpty) {
       return const Center(
-        child: Text(
-          'Отзывов пока нет.',
-          style: TextStyle(color: Colors.white70, fontSize: 18),
-        ),
-      );
+          child: Text('Отзывов пока нет.',
+              style: TextStyle(color: Colors.white70, fontSize: 18)));
     }
 
     return ListView.builder(
@@ -817,17 +1036,13 @@ class _ReviewListPageState extends State<ReviewListPage> {
       itemCount: _reviews.length,
       itemBuilder: (context, index) {
         final review = _reviews[index];
-
         final int rating = review['rating'] ?? 0;
-
-        // ❗️ ИСТИФОДАИ ФУНКСИЯИ ЁРИРАСОНИ НАВ
         final DateTime? parsedDate = review['created_at'] != null
             ? _tryParseDate(review['created_at'])
             : null;
         final String dateStr = parsedDate != null
             ? DateFormat('dd.MM.yyyy HH:mm').format(parsedDate)
             : 'Нет даты';
-
         final String clientName =
             review['client']?['full_name'] ?? 'Анонимный клиент';
         final String orderName = review['order_name'] ?? 'Без названия';
@@ -839,70 +1054,54 @@ class _ReviewListPageState extends State<ReviewListPage> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        'Оценка за заказ "$orderName"',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                        child: Text('Оценка за заказ "$orderName"',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold))),
                     const SizedBox(width: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.star,
-                            color: Color(0xFFdcd232), size: 20),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$rating',
+                    Row(children: [
+                      const Icon(Icons.star,
+                          color: Color(0xFFdcd232), size: 20),
+                      const SizedBox(width: 4),
+                      Text('$rating',
                           style: const TextStyle(
                               color: Color(0xFFdcd232),
                               fontSize: 18,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  dateStr,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-                if (review['comment'] != null &&
-                    review['comment'].isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
+                              fontWeight: FontWeight.bold)),
+                    ]),
+                  ]),
+              const SizedBox(height: 8),
+              Text(dateStr,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              if (review['comment'] != null &&
+                  review['comment'].isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      review['comment'],
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                  ),
-                ],
-                const Divider(color: Colors.white24, height: 24),
-                Text(
-                  'От: $clientName',
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Text(review['comment'],
+                      style:
+                          const TextStyle(color: Colors.white, fontSize: 14)),
+                ),
+              ],
+              const Divider(color: Colors.white24, height: 24),
+              Text('От: $clientName',
                   style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
-                      fontStyle: FontStyle.italic),
-                ),
-              ],
-            ),
+                      fontStyle: FontStyle.italic)),
+            ]),
           ),
         );
       },
