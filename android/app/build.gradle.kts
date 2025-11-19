@@ -61,17 +61,19 @@ android {
     // === ҚИСМИ 2: Ин блок конфигуратсияи имзоро эҷод мекунад ===
     signingConfigs {
         create("release") {
-            if (keystorePropertiesFile.exists()) {
-                val keyAliasProp = keystoreProperties.getProperty("keyAlias")
-                val keyPasswordProp = keystoreProperties.getProperty("keyPassword")
-                val storeFileProp = keystoreProperties.getProperty("storeFile")
-                val storePasswordProp = keystoreProperties.getProperty("storePassword")
-                
-                if (keyAliasProp != null && keyPasswordProp != null && storeFileProp != null && storePasswordProp != null) {
+            // Аввал кӯшиш мекунад, ки аз environment variables (Codemagic) истифода барад
+            val keystorePath = System.getenv("CM_KEYSTORE_PATH") ?: keystoreProperties.getProperty("storeFile")
+            val keystorePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
+            val keyAliasProp = System.getenv("CM_KEY_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
+            val keyPasswordProp = System.getenv("CM_KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
+            
+            if (keystorePath != null && keystorePassword != null && keyAliasProp != null && keyPasswordProp != null) {
+                val keystoreFile = file(keystorePath)
+                if (keystoreFile.exists()) {
                     keyAlias = keyAliasProp
                     keyPassword = keyPasswordProp
-                    storeFile = file(storeFileProp)
-                    storePassword = storePasswordProp
+                    storeFile = keystoreFile
+                    storePassword = keystorePassword
                 }
             }
         }
@@ -81,18 +83,36 @@ android {
     buildTypes {
         getByName("release") {
             // === ҚИСМИ 3: Ин сатр конфигуратсияи имзоро истифода мебарад ===
-            // Only use signing config if key.properties exists and has valid properties
-            val keystoreFile = keystoreProperties.getProperty("storeFile")
-            if (keystorePropertiesFile.exists() && keystoreFile != null && file(keystoreFile).exists()) {
-                signingConfig = signingConfigs.getByName("release")
+            // Кӯшиш мекунад, ки signing config-и release-ро истифода барад, агар мавҷуд бошад
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning != null && releaseSigning.storeFile != null && releaseSigning.storeFile!!.exists()) {
+                signingConfig = releaseSigning
+            } else {
+                // Агар signing config мавҷуд набошад, аз debug signing истифода мекунад
+                // Ин барои Codemagic муфид аст, агар signing натанзим шуда бошад
+                signingConfig = signingConfigs.getByName("debug")
             }
             // ==============================================================
 
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+    
+    // Таъмини сохтани bundle файл
+    bundle {
+        language {
+            enableSplit = false
+        }
+        density {
+            enableSplit = false
+        }
+        abi {
+            enableSplit = true
         }
     }
 }
