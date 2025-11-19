@@ -82,34 +82,9 @@ android {
 
     buildTypes {
         getByName("release") {
-            // Барои Codemagic: агар release signing мавҷуд набошад, аз debug signing истифода мекунад
-            val releaseSigning = signingConfigs.findByName("release")
-            signingConfig = if (releaseSigning != null && releaseSigning.storeFile != null && releaseSigning.storeFile!!.exists()) {
-                releaseSigning
-            } else {
-                signingConfigs.getByName("debug")
-            }
-
-            // Барои тафтиш: minify ва shrink-ро ғайрифаъол кардем
+            // Барои Codemagic: истифодаи debug signing барои тафтиш
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
-            isShrinkResources = false  // Явно ғайрифаъол кардем
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-    
-    // Таъмини сохтани bundle файл
-    bundle {
-        language {
-            enableSplit = false
-        }
-        density {
-            enableSplit = false
-        }
-        abi {
-            enableSplit = false
         }
     }
 }
