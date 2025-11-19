@@ -94,6 +94,5 @@ flutter {
 }
 
 dependencies {
-    // Ин сатрро нест кардан ё коммент кардан мумкин аст, зеро мо дигар аз Yandex истифода намебарем
-    // implementation("com.yandex.android:maps.mobile:4.5.1-lite")
+
 }
