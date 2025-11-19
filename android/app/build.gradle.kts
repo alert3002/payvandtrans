@@ -92,6 +92,7 @@ android {
 
             // Барои тафтиш: minify ва shrink-ро ғайрифаъол кардем
             isMinifyEnabled = false
+            isShrinkResources = false  // Явно ғайрифаъол кардем
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -120,33 +121,4 @@ flutter {
 dependencies {
     // Ин сатрро нест кардан ё коммент кардан мумкин аст, зеро мо дигар аз Yandex истифода намебарем
     // implementation("com.yandex.android:maps.mobile:4.5.1-lite")
-}
-
-// Вазъияти файли bundle-ро пас аз сохт тафтиш мекунад
-afterEvaluate {
-    tasks.named("bundleRelease") {
-        doLast {
-            val bundleDir = file("${project.buildDir}/outputs/bundle/release")
-            val bundleFile = file("${bundleDir}/app-release.aab")
-            
-            println("=== Bundle File Check ===")
-            println("Bundle directory: ${bundleDir.absolutePath}")
-            println("Bundle file exists: ${bundleFile.exists()}")
-            if (bundleFile.exists()) {
-                println("Bundle file size: ${bundleFile.length()} bytes")
-                println("Bundle file path: ${bundleFile.absolutePath}")
-            } else {
-                println("ERROR: Bundle file not found!")
-                println("Listing files in bundle directory:")
-                if (bundleDir.exists()) {
-                    bundleDir.listFiles()?.forEach { file ->
-                        println("  - ${file.name} (${file.length()} bytes)")
-                    }
-                } else {
-                    println("  Bundle directory does not exist!")
-                }
-            }
-            println("========================")
-        }
-    }
 }
