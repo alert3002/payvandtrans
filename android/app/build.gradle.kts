@@ -62,10 +62,17 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
+                val keyAliasProp = keystoreProperties.getProperty("keyAlias")
+                val keyPasswordProp = keystoreProperties.getProperty("keyPassword")
+                val storeFileProp = keystoreProperties.getProperty("storeFile")
+                val storePasswordProp = keystoreProperties.getProperty("storePassword")
+                
+                if (keyAliasProp != null && keyPasswordProp != null && storeFileProp != null && storePasswordProp != null) {
+                    keyAlias = keyAliasProp
+                    keyPassword = keyPasswordProp
+                    storeFile = file(storeFileProp)
+                    storePassword = storePasswordProp
+                }
             }
         }
     }
@@ -74,7 +81,11 @@ android {
     buildTypes {
         getByName("release") {
             // === ҚИСМИ 3: Ин сатр конфигуратсияи имзоро истифода мебарад ===
-            signingConfig = signingConfigs.getByName("release")
+            // Only use signing config if key.properties exists and has valid properties
+            val keystoreFile = keystoreProperties.getProperty("storeFile")
+            if (keystorePropertiesFile.exists() && keystoreFile != null && file(keystoreFile).exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             // ==============================================================
 
             isMinifyEnabled = true
