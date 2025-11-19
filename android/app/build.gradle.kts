@@ -27,11 +27,11 @@ if (keystorePropertiesFile.exists()) {
 // =======================================================
 
 val localProps = localProperties()
-val flutterVersionCode = localProps.getProperty("flutter.versionCode")
-val flutterVersionName = localProps.getProperty("flutter.versionName")
+val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "3").toString()
+val flutterVersionName = (project.findProperty("flutter.versionName") ?: "1.0.3").toString()
 
 android {
-    namespace = "com.example.my_app"
+    namespace = "com.payvandtrans.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -51,7 +51,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.my_app"
+        applicationId = "com.payvandtrans.app"
         minSdk = 26
         targetSdk = 34
         versionCode = flutterVersionCode.toInt()
