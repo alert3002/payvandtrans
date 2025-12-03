@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/city_model.dart';
 import 'models/transport_model.dart';
+import 'constants/api_constants.dart';
 
 // Ин класс барои нигоҳ доштани ҳолати филтрҳо истифода мешавад
 class FilterSettings {
@@ -52,9 +53,9 @@ class _FilterPageState extends State<FilterPage> {
 
     try {
       final responses = await Future.wait([
-        http.get(Uri.parse('https://app.payvandtrans.com/api/cities/'),
+        http.get(ApiConstants.getUri('api/cities/'),
             headers: {'Authorization': 'Bearer $token'}),
-        http.get(Uri.parse('https://app.payvandtrans.com/api/transports/'),
+        http.get(ApiConstants.getUri('api/transports/'),
             headers: {'Authorization': 'Bearer $token'}),
       ]);
 

@@ -5,6 +5,7 @@ import 'package:my_app/models/transport_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
+import 'constants/api_constants.dart';
 
 class TransportPage extends StatefulWidget {
   const TransportPage({super.key});
@@ -51,9 +52,9 @@ class _TransportPageState extends State<TransportPage> {
     try {
       // Дар як вақт ҳам маълумоти профил ва ҳам рӯйхати транспортҳоро мегирем
       final responses = await Future.wait([
-        http.get(Uri.parse('https://app.payvandtrans.com/api/me/'),
+        http.get(ApiConstants.getUri('api/me/'),
             headers: {'Authorization': 'Bearer $token'}),
-        http.get(Uri.parse('https://app.payvandtrans.com/api/transports/'),
+        http.get(ApiConstants.getUri('api/transports/'),
             headers: {'Authorization': 'Bearer $token'}),
       ]);
 
@@ -137,7 +138,7 @@ class _TransportPageState extends State<TransportPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     var request = http.MultipartRequest(
-        'PATCH', Uri.parse('https://app.payvandtrans.com/api/me/'));
+        'PATCH', ApiConstants.getUri('api/me/'));
     request.headers['Authorization'] = 'Bearer $token';
 
     // Майдонҳои матниро илова мекунем

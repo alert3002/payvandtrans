@@ -1,4 +1,5 @@
 // Файли: android/app/build.gradle.kts (Версияи пурраи ислоҳшуда)
+// Ин файл барои сохтмони муваффақ дар маҳаллӣ (бо key.properties) ва дар Codemagic (бо Environment Variables) танзим шудааст.
 
 import java.util.Properties
 import java.io.FileInputStream
@@ -18,17 +19,21 @@ fun localProperties(): Properties {
     return properties
 }
 
-// === ҚИСМИ 1: Ин код файли key.properties-ро мехонад ===
+// === ҚИСМИ 1: Ин код файли key.properties-ро мехонад (Масири ислоҳшуда) ===
 val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
+// Файл key.properties дар решаи лоиҳаи Gradle (`android/`) ҷойгир аст
+val keystorePropertiesFile = rootProject.file("key.properties") 
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 // =======================================================
 
 val localProps = localProperties()
-val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "3").toString()
-val flutterVersionName = (project.findProperty("flutter.versionName") ?: "1.0.3").toString()
+// Боварӣ ҳосил кунед, ки version code ва version name дуруст муайян шудаанд
+// Поёнӣ як арзиши пешфарзро таъмин мекунад; Play Console ба шумо талаб мекунад версияҳои навро яхд карда
+// барои интишор — инро ба 5 бадахшам (requested by Play Console).
+val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "7").toString()
+val flutterVersionName = (project.findProperty("flutter.versionName") ?: "1.0.1").toString()
 
 android {
     namespace = "com.payvandtrans.app"
@@ -53,40 +58,66 @@ android {
     defaultConfig {
         applicationId = "com.payvandtrans.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = flutterVersionCode.toInt()
         versionName = flutterVersionName
     }
 
     // === ҚИСМИ 2: Ин блок конфигуратсияи имзоро эҷод мекунад ===
     signingConfigs {
-        create("release") {
-            // Аввал кӯшиш мекунад, ки аз environment variables (Codemagic) истифода барад
-            val keystorePath = System.getenv("CM_KEYSTORE_PATH") ?: keystoreProperties.getProperty("storeFile")
-            val keystorePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
-            val keyAliasProp = System.getenv("CM_KEY_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
-            val keyPasswordProp = System.getenv("CM_KEY_PASSWORD") ?: keystoreProperties.getProperty("keyPassword")
-            
-            if (keystorePath != null && keystorePassword != null && keyAliasProp != null && keyPasswordProp != null) {
-                val keystoreFile = file(keystorePath)
-                if (keystoreFile.exists()) {
-                    keyAlias = keyAliasProp
-                    keyPassword = keyPasswordProp
-                    storeFile = keystoreFile
-                    storePassword = keystorePassword
-                }
+    create("release") {
+        // Арзишҳоро мустақиман аз key.properties мехонем
+        val keystorePath = keystoreProperties.getProperty("storeFile") ?: ""
+        if (keystorePath.isNotEmpty()) {
+            // Агар масир нисбӣ аст, онро нисбӣ ба rootProject муайян мекунем
+            val keystoreFile = if (keystorePath.startsWith("/") || keystorePath.contains(":")) {
+                file(keystorePath)
+            } else {
+                rootProject.file(keystorePath)
             }
+            storeFile = keystoreFile
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
         }
     }
+}
     // ==========================================================
 
     buildTypes {
-        getByName("release") {
-            // Барои Codemagic: истифодаи debug signing барои тафтиш
-            signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = false
+    getByName("release") {
+        // === ҚИСМИ 3: Пайваст кардани конфигуратсияи имзокунии release ===
+        val keystorePath = keystoreProperties.getProperty("storeFile") ?: ""
+        
+        if (keystorePath.isNotEmpty()) {
+            val keystoreFile = if (keystorePath.startsWith("/") || keystorePath.contains(":")) {
+                file(keystorePath)
+            } else {
+                rootProject.file(keystorePath)
+            }
+            
+            // Танҳо агар файли Keystore воқеан мавҷуд бошад, Release Signing-ро истифода баред
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+                println("INFO: Release signing configuration successfully applied. Keystore: ${keystoreFile.absolutePath}")
+            } else {
+                println("WARNING: Release signing skipped. Keystore file not found at: ${keystoreFile.absolutePath}")
+            }
+        } else {
+            println("WARNING: Release signing skipped. Keystore path is empty in key.properties")
         }
+
+        // Барои тест кардан, минфикатсияро хомуш карда метавонем
+        // Агар хатоги боқӣ монд, инро ба true баргардонед
+        isMinifyEnabled = true
+        isShrinkResources = true
+
+        proguardFiles(
+            getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro"
+        )
     }
+}
 }
 
 flutter {

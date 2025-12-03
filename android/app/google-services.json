@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "518679251560",
+    "project_id": "payvandtrans-484af",
+    "storage_bucket": "payvandtrans-484af.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:518679251560:android:289602f4c95c4c15c009dd",
+        "android_client_info": {
+          "package_name": "com.payvandtrans.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByyE4caWVmbXMN2AQJuTL1dJeUlmsg3eU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

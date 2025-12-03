@@ -1,10 +1,10 @@
-package com.example.my_app // Номи пакети худро санҷед
+package com.payvandtrans.app
 
 import io.flutter.app.FlutterApplication
 
 class MainApplication : FlutterApplication() {
     override fun onCreate() {
         super.onCreate()
-        // Дар ин ҷо коди иловагӣ лозим нест
     }
 }
+

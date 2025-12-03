@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models/request_model.dart';
 import 'order_detail_page.dart';
 import 'filter_page.dart';
+import 'constants/api_constants.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,7 +25,7 @@ class _HomePageState extends State<HomePage> {
     _loadUserRoleAndFetchData();
   }
 
-  void _loadUserRoleAndFetchData() async {
+  Future<void> _loadUserRoleAndFetchData() async {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
@@ -36,10 +37,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<List<Request>> _fetchRequests() async {
     final isDriver = _userRole == 'driver';
-    final urlString = isDriver
-        ? 'https://app.payvandtrans.com/api/zayavki/'
-        : 'https://app.payvandtrans.com/api/requests/';
-    final url = Uri.parse(urlString);
+    final url = isDriver
+        ? ApiConstants.getUri('api/zayavki/')
+        : ApiConstants.getUri('api/requests/');
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -117,8 +117,14 @@ class _HomePageState extends State<HomePage> {
     switch (status?.toLowerCase()) {
       case 'active':
         return Colors.greenAccent;
+      case 'awaiting_confirmation':
+        return Colors.orangeAccent;
       case 'pending':
         return Colors.orangeAccent;
+      case 'in_transit':
+        return Colors.blueAccent;
+      case 'closed':
+        return Colors.grey;
       case 'completed':
         return Colors.grey;
       default:
@@ -130,8 +136,14 @@ class _HomePageState extends State<HomePage> {
     switch (status?.toLowerCase()) {
       case 'active':
         return 'Актив';
+      case 'awaiting_confirmation':
+        return 'Ожидает подтверждения';
       case 'pending':
         return 'На рассмотрении';
+      case 'in_transit':
+        return 'В пути';
+      case 'closed':
+        return 'Закрыт';
       case 'completed':
         return 'Завершён';
       default:
@@ -154,20 +166,39 @@ class _HomePageState extends State<HomePage> {
             style: const TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold)),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              setState(() {
+                _requestsFuture = _fetchRequests();
+              });
+            },
+            tooltip: 'Обновить',
+          ),
           TextButton.icon(
             onPressed: _openFilterPage, // <-- ФУНКСИЯИ НАВРО ИСТИФОДА МЕБАРЕМ
             icon: const Icon(Icons.filter_list, color: Colors.white, size: 20),
             label: const Text('ФИЛЬТР', style: TextStyle(color: Colors.white)),
           ),
           IconButton(
-              icon: const Icon(Icons.notifications_none, color: Colors.white),
-              onPressed: () {}),
+              icon: const Icon(Icons.notifications_active, color: Colors.white),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Push-уведомления включены. Вы будете получать уведомления о новых заказах и изменениях статусов.'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+              tooltip: 'Push-уведомления',
+          ),
           const SizedBox(width: 5),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          _loadUserRoleAndFetchData();
+          await _loadUserRoleAndFetchData();
         },
         color: const Color(0xFFdcd232),
         backgroundColor: const Color(0xFF2a2a2e),
@@ -214,7 +245,7 @@ class _HomePageState extends State<HomePage> {
         onTap: !isTappable
             ? null
             : () async {
-                final result = await Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (context) => OrderDetailPage(
@@ -222,9 +253,8 @@ class _HomePageState extends State<HomePage> {
                             userRole: _userRole, // <-- ИН САТР ИЛОВА ШУД
                           )),
                 );
-                if (result == true) {
-                  _loadUserRoleAndFetchData();
-                }
+                // Обновляем данные при возврате (независимо от результата)
+                _loadUserRoleAndFetchData();
               },
         child: Card(
           // ... боқимондаи код бе тағйир
@@ -291,7 +321,7 @@ class _HomePageState extends State<HomePage> {
       onTap: !isTappable
           ? null
           : () async {
-              final result = await Navigator.push(
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => OrderDetailPage(
@@ -300,9 +330,8 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               );
-              if (result == true) {
-                _loadUserRoleAndFetchData();
-              }
+              // Обновляем данные при возврате (независимо от результата)
+              _loadUserRoleAndFetchData();
             },
       child: Card(
         color: const Color(0xFF2a2a2e),

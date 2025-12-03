@@ -71,6 +71,8 @@ class Request {
   final String? createdAt;
   final String? description;
   final double? commissionPercentage;
+  final String? driverPhone;  // Телефон водителя (для клиента)
+  final String? clientPhone;  // Телефон клиента (для водителя)
 
   Request({
     this.id,
@@ -87,6 +89,8 @@ class Request {
     this.createdAt,
     this.description,
     this.commissionPercentage,
+    this.driverPhone,
+    this.clientPhone,
   });
 
   String get originCity =>
@@ -138,6 +142,8 @@ class Request {
       createdAt: json['created_at'],
       description: json['description'],
       commissionPercentage: _parseDouble(json['commission_percentage']),
+      driverPhone: json['driver_phone'],
+      clientPhone: json['client_phone'],
     );
   }
 }

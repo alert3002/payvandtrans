@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'auth_screen.dart';
 import 'main_screen.dart'; // <-- 1. IMPORT-И НАВ ИЛОВА ШУД
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Инициализация Firebase
+  try {
+    await Firebase.initializeApp();
+    print('✅ Firebase инициализирован успешно');
+  } catch (e) {
+    print('⚠️ Ошибка инициализации Firebase: $e');
+  }
+  
   runApp(const MyApp());
 }
 

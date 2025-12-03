@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/order_model.dart';
 import 'order_detail_page.dart';
+import 'constants/api_constants.dart';
 
 class MyOrdersPage extends StatefulWidget {
   const MyOrdersPage({super.key});
@@ -30,7 +31,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   }
 
   Future<List<Order>> _fetchMyOrders() async {
-    final url = Uri.parse('https://app.payvandtrans.com/api/my_orders/driver/');
+    final url = ApiConstants.getUri('api/my_orders/driver/');
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
@@ -64,8 +65,8 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
         return Colors.greenAccent;
       case 'in_transit':
         return Colors.blueAccent;
-      case 'awaiting_payment':
-      case 'paid':
+      case 'awaiting_confirmation':
+      case 'pending':
         return Colors.orangeAccent;
       case 'closed':
         return Colors.grey;
@@ -80,14 +81,12 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
         return 'Актив';
       case 'in_transit':
         return 'В пути';
-      case 'awaiting_payment':
-        return 'Ожидает подтверждения';
-      case 'paid':
-        return 'Оплачен';
+      case 'awaiting_confirmation':
+        return 'Ожидание передачи заказа';
+      case 'pending':
+        return 'На рассмотрении';
       case 'closed':
         return 'Закрыт';
-      case 'pending': // <-- ИН САТР ИЛОВА ШУД
-        return 'На рассмотрении';
       default:
         return status ?? 'Неизвестно';
     }
@@ -103,6 +102,13 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
         automaticallyImplyLeading: false,
         title: const Text('Мои заказы',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _refreshOrders,
+            tooltip: 'Обновить',
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshOrders,
@@ -148,7 +154,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
           return;
         }
 
-        final result = await Navigator.push(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => OrderDetailPage(
@@ -158,7 +164,8 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
             ),
           ),
         );
-        if (result == true && mounted) {
+        // Обновляем данные при возврате (независимо от результата)
+        if (mounted) {
           _refreshOrders();
         }
       },
@@ -181,8 +188,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
               _buildInfoRow('Цена:',
                   '${double.tryParse(order.orderSum)?.toStringAsFixed(0) ?? '0'} смн',
                   isPrice: true),
-              _buildInfoRow('Статус:', _getRussianStatus(order.status),
-                  statusColor: _getStatusColor(order.status)),
+              _buildStatusRow(order.status),
             ],
           ),
         ),
@@ -208,6 +214,42 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(String? status) {
+    final isAwaiting = status?.toLowerCase() == 'awaiting_confirmation';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Статус:',
+              style: TextStyle(color: Colors.white70, fontSize: 14)),
+          Row(
+            children: [
+              if (isAwaiting)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFFdcd232),
+                  ),
+                ),
+              if (isAwaiting) const SizedBox(width: 8),
+              Text(
+                _getRussianStatus(status),
+                style: TextStyle(
+                  color: _getStatusColor(status),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ],
       ),

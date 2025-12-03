@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:latlong2/latlong.dart';
 import 'models/request_model.dart';
 import 'route_map_page.dart';
+import 'constants/api_constants.dart';
 
 class Stop {
   City? city;
@@ -320,7 +321,7 @@ class _AddRequestPageState extends State<AddRequestPage> {
         .map((stop) => stop.warehouseController.text)
         .join(';');
 
-    final url = Uri.parse('https://app.payvandtrans.com/api/requests/create/');
+    final url = ApiConstants.getUri('api/requests/create/');
     final headers = {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
@@ -426,13 +427,13 @@ class _AddRequestPageState extends State<AddRequestPage> {
 
   Future<List<TransportCategory>> _fetchTransportCategories() async {
     final data = await _fetchPaginatedData(
-        'https://app.payvandtrans.com/api/transports/');
+        ApiConstants.getUrl('api/transports/'));
     return data.map((json) => TransportCategory.fromJson(json)).toList();
   }
 
   Future<List<City>> _fetchCities() async {
     final data =
-        await _fetchPaginatedData('https://app.payvandtrans.com/api/cities/');
+        await _fetchPaginatedData(ApiConstants.getUrl('api/cities/'));
     final list = data.map((json) => City.fromJson(json)).toList();
     // Обновляем локальный кеш для поиска по id
     _citiesCache = list;

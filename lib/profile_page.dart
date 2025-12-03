@@ -9,6 +9,8 @@ import 'transport_page.dart';
 import 'balance_page.dart';
 import 'auth_screen.dart';
 import 'models/city_model.dart'; // Убедитесь, что этот файл есть и класс City реализован
+import 'constants/api_constants.dart';
+import 'my_reviews_page.dart';
 
 // =======================================================================
 // ProfilePage
@@ -50,7 +52,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       final response = await http.get(
-        Uri.parse('https://app.payvandtrans.com/api/me/'),
+        ApiConstants.getUri('api/me/'),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (mounted && response.statusCode == 200) {
@@ -217,27 +219,38 @@ class _ProfilePageState extends State<ProfilePage> {
                 },
               ),
               const SizedBox(height: 16),
-              _buildMenuItem(
-                icon: Icons.reviews,
-                text: 'Отзывы',
-                onTap: () {
-                  if (_userId != null) {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                ReviewListPage(driverId: _userId!)));
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content:
-                              Text('Не удалось получить ID пользователя.')),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
             ],
+
+            // Кнопка "Мои отзывы" видна всем пользователям (водителям и клиентам)
+            _buildMenuItem(
+              icon: Icons.star_rate_rounded,
+              text: 'Мои отзывы',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MyReviewsPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            
+            // Кнопка "Уведомления" (информационная)
+            _buildMenuItem(
+              icon: Icons.notifications_active,
+              text: 'Push-уведомления',
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Push-уведомления включены. Вы будете получать уведомления о новых заказах и изменениях статусов.'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
 
             _buildMenuItem(
               icon: Icons.exit_to_app,
@@ -307,9 +320,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     try {
       final responses = await Future.wait([
-        http.get(Uri.parse('https://app.payvandtrans.com/api/me/'),
+        http.get(ApiConstants.getUri('api/me/'),
             headers: {'Authorization': 'Bearer $token'}),
-        http.get(Uri.parse('https://app.payvandtrans.com/api/cities/'),
+        http.get(ApiConstants.getUri('api/cities/'),
             headers: {'Authorization': 'Bearer $token'}),
       ]);
 
@@ -381,7 +394,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     var request = http.MultipartRequest(
-        'PATCH', Uri.parse('https://app.payvandtrans.com/api/me/'));
+        'PATCH', ApiConstants.getUri('api/me/'));
     request.headers['Authorization'] = 'Bearer $token';
 
     request.fields['full_name'] = _fullNameController.text;
@@ -738,7 +751,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
     try {
       // Измените этот URI если ваш backend использует другой путь для удаления
-      final deleteUri = Uri.parse('https://app.payvandtrans.com/api/me/');
+      final deleteUri = ApiConstants.getUri('api/me/');
 
       final resp = await http.delete(
         deleteUri,
@@ -761,7 +774,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       } else {
         // Возможный fallback: попробуем другой endpoint (например users/me)
         final fallbackUri =
-            Uri.parse('https://app.payvandtrans.com/api/users/me/');
+            ApiConstants.getUri('api/users/me/');
         final resp2 = await http.delete(
           fallbackUri,
           headers: {
@@ -939,8 +952,7 @@ class _ReviewListPageState extends State<ReviewListPage> {
 
     try {
       final response = await http.get(
-        Uri.parse(
-            'https://app.payvandtrans.com/api/drivers/${widget.driverId}/reviews/'),
+        ApiConstants.getUri('api/drivers/${widget.driverId}/reviews/'),
         headers: {'Authorization': 'Bearer $token'},
       );
 

@@ -8,6 +8,7 @@ import 'profile_page.dart';
 import 'my_orders_page.dart';
 import 'add_request_page.dart';
 import 'my_requests_page.dart';
+import 'services/push_notification_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -38,6 +39,20 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _loadUserRole();
+    // Инициализация push-уведомлений при открытии приложения (если пользователь уже авторизован)
+    _initPushNotifications();
+  }
+
+  Future<void> _initPushNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token != null && mounted) {
+      try {
+        await PushNotificationService.initPushNotifications(context);
+      } catch (e) {
+        print('⚠️ Ошибка инициализации push-уведомлений: $e');
+      }
+    }
   }
 
   Future<void> _loadUserRole() async {

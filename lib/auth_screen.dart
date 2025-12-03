@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'otp_screen.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'constants/api_constants.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -54,12 +56,16 @@ class _AuthScreenState extends State<AuthScreen>
     final isLogin = _tabController.index == 0;
 
     try {
-      final checkUrl =
-          Uri.parse('https://app.payvandtrans.com/api/check_phone/');
+      final checkUrl = ApiConstants.getUri('api/check_phone/');
       final checkResponse = await http.post(
         checkUrl,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'phone': phone}),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Запрос превысил время ожидания. Проверьте подключение к интернету.');
+        },
       );
 
       if (checkResponse.statusCode != 200) {
@@ -89,9 +95,12 @@ class _AuthScreenState extends State<AuthScreen>
       }
 //...
       await _sendOtp(phone);
+    } on TimeoutException catch (e) {
+      _showErrorSnackBar(e.message ?? 'Превышено время ожидания. Проверьте подключение к интернету.');
+    } on http.ClientException catch (e) {
+      _showErrorSnackBar('Ошибка подключения: ${e.message}. Проверьте подключение к интернету.');
     } catch (error) {
-      _showErrorSnackBar(
-          'Ошибка подключения. Проверьте подключение к интернету.');
+      _showErrorSnackBar('Ошибка подключения: ${error.toString()}. Проверьте подключение к интернету.');
     } finally {
       if (mounted) {
         setState(() {
@@ -102,26 +111,49 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _sendOtp(String phone) async {
-    final url = Uri.parse('https://app.payvandtrans.com/send_otp/');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'phone': phone}),
-    );
-    final responseData = json.decode(response.body);
+    try {
+      final url = ApiConstants.getUri('send_otp/');
+      // Увеличиваем таймаут до 90 секунд для избежания ошибок при медленном API
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'phone': phone}),
+      ).timeout(
+        const Duration(seconds: 90),
+        onTimeout: () {
+          throw TimeoutException('Запрос превысил время ожидания. Попробуйте снова.');
+        },
+      );
 
-    if (response.statusCode == 200 && responseData['success'] == true) {
-      final role = _tabController.index == 1 ? _selectedRole : null;
-      if (mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => OtpScreen(phoneNumber: phone, role: role),
-          ),
-        );
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        final role = _tabController.index == 1 ? _selectedRole : null;
+        if (mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => OtpScreen(phoneNumber: phone, role: role),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          _showErrorSnackBar(
+              responseData['message'] ?? 'Ошибка отправки СМС. Попробуйте снова.');
+        }
       }
-    } else {
-      _showErrorSnackBar(
-          responseData['message'] ?? 'Ошибка отправки СМС. Попробуйте снова.');
+    } on TimeoutException catch (e) {
+      if (mounted) {
+        _showErrorSnackBar(e.message ?? 'Превышено время ожидания. Попробуйте снова.');
+      }
+    } on http.ClientException catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Ошибка подключения: ${e.message}. Проверьте интернет.');
+      }
+    } catch (error) {
+      if (mounted) {
+        _showErrorSnackBar('Ошибка отправки СМС: ${error.toString()}');
+      }
     }
   }
 

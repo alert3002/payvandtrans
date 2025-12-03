@@ -98,7 +98,7 @@ class BalancePage extends StatelessWidget {
                 icon: Icons.account_balance,
                 title: 'DC Next',
                 subtitle:
-                    'После перехода проверьте номер получателя перед переводом: 9929257711',
+                    'После перехода проверьте номер получателя перед переводом: +992 (99) 925-77-11',
                 onTap: () {
                   // Дар ин ҷо deeplink барои DC Next-ро мегузоред
                   _launchUrl('dcnexpay://');
@@ -107,7 +107,7 @@ class BalancePage extends StatelessWidget {
                 icon: Icons.credit_card,
                 title: 'Эсхата Онлайн',
                 subtitle:
-                    'После перехода проверьте номер получателя перед переводом: 9929257711',
+                    'После перехода проверьте номер получателя перед переводом: +992 (99) 925-77-11',
                 onTap: () {
                   // Дар ин ҷо deeplink барои Эсхата Онлайн-ро мегузоред
                   _launchUrl('eskhataonline://');
@@ -116,7 +116,7 @@ class BalancePage extends StatelessWidget {
                 icon: Icons.phone_android,
                 title: 'Alif Mobi',
                 subtitle:
-                    'После перехода выберите перевод на alif mobi и введите номер телефона: 9929257711',
+                    'После перехода выберите перевод на alif mobi и введите номер телефона: +992 (99) 925-77-11',
                 onTap: () {
                   // Дар ин ҷо deeplink барои Alif Mobi-ро мегузоред
                   _launchUrl('alifmobi://');

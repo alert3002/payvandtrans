@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'client_home_screen.dart';
-import 'driver_home_screen.dart';
 import 'main_screen.dart';
+import 'constants/api_constants.dart';
+import 'services/push_notification_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -23,10 +24,16 @@ class _OtpScreenState extends State<OtpScreen> {
       List.generate(4, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
   bool _isLoading = false;
+  
+  // Таймер для повторной отправки
+  Timer? _timer;
+  int _countdown = 30;
+  bool _isResendActive = false;
 
   @override
   void initState() {
     super.initState();
+    _startTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNodes[0].requestFocus();
     });
@@ -34,6 +41,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   void dispose() {
+    _timer?.cancel(); // Отменяем таймер для избежания утечек памяти
     for (var controller in _controllers) {
       controller.dispose();
     }
@@ -41,6 +49,105 @@ class _OtpScreenState extends State<OtpScreen> {
       focusNode.dispose();
     }
     super.dispose();
+  }
+
+  void _startTimer() {
+    _countdown = 30;
+    _isResendActive = false;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          if (_countdown > 0) {
+            _countdown--;
+          } else {
+            _isResendActive = true;
+            _timer?.cancel();
+          }
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _resendOtp() async {
+    if (!_isResendActive || _isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final url = ApiConstants.getUri('send_otp/');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'phone': widget.phoneNumber}),
+      ).timeout(
+        const Duration(seconds: 90),
+        onTimeout: () {
+          throw TimeoutException('Запрос превысил время ожидания. Попробуйте снова.');
+        },
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Код отправлен повторно'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Сбрасываем таймер и запускаем заново
+          _startTimer();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(responseData['message'] ?? 'Ошибка отправки СМС. Попробуйте снова.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } on TimeoutException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'Превышено время ожидания. Попробуйте снова.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } on http.ClientException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка подключения: ${e.message}. Проверьте интернет.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка отправки СМС: ${error.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _verifyOtp() async {
@@ -52,7 +159,7 @@ class _OtpScreenState extends State<OtpScreen> {
     });
 
     final otp = _controllers.map((c) => c.text).join();
-    final url = Uri.parse('https://app.payvandtrans.com/verify_otp/');
+    final url = ApiConstants.getUri('verify_otp/');
 
     final Map<String, String?> body = {
       'phone': widget.phoneNumber,
@@ -80,6 +187,14 @@ class _OtpScreenState extends State<OtpScreen> {
 
         if (mounted) {
           // ✅ ИСЛОҲ ШУД: Гузариш ба MainScreen танҳо дар ҳолати муваффақият
+          
+          // Инициализация push-уведомлений после успешного входа
+          try {
+            await PushNotificationService.initPushNotifications(context);
+          } catch (e) {
+            print('⚠️ Ошибка инициализации push-уведомлений: $e');
+          }
+          
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => const MainScreen(),
@@ -181,6 +296,25 @@ class _OtpScreenState extends State<OtpScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Кнопка повторной отправки кода
+                Center(
+                  child: TextButton(
+                    onPressed: _isResendActive && !_isLoading ? _resendOtp : null,
+                    child: Text(
+                      _isResendActive
+                          ? 'Отправить код повторно'
+                          : 'Отправить повторно через $_countdown сек',
+                      style: TextStyle(
+                        color: _isResendActive
+                            ? const Color(0xFFdcd232)
+                            : Colors.grey,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
               ],

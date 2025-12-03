@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/request_model.dart';
 import 'order_detail_page.dart';
+import 'constants/api_constants.dart';
+import 'leave_review_page.dart';
 
 class MyRequestsPage extends StatefulWidget {
   const MyRequestsPage({super.key});
@@ -29,8 +31,7 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
   }
 
   Future<List<Request>> _fetchMyRequests() async {
-    const urlString = 'https://app.payvandtrans.com/api/requests/';
-    final url = Uri.parse(urlString);
+    final url = ApiConstants.getUri('api/requests/');
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -74,8 +75,7 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
 
     try {
       final response = await http.post(
-        Uri.parse(
-            'https://app.payvandtrans.com/api/orders/$requestId/client_close/'),
+        ApiConstants.getUri('api/orders/$requestId/client_close/'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -84,11 +84,23 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
       if (!mounted) return;
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Заказ успешно закрыт!'),
-          backgroundColor: Colors.green,
-        ));
-        _refreshRequests();
+        final data = json.decode(utf8.decode(response.bodyBytes));
+        final orderId = data['order_id'];
+        
+        // Сразу после успешного закрытия перенаправляем на экран отзыва
+        if (orderId != null && mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => LeaveReviewPage(orderId: orderId),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Заказ успешно закрыт!'),
+            backgroundColor: Colors.green,
+          ));
+          _refreshRequests();
+        }
       } else {
         final data = json.decode(utf8.decode(response.bodyBytes));
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -164,6 +176,8 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
         return Colors.blueAccent;
       case 'pending':
         return Colors.orangeAccent;
+      case 'awaiting_confirmation':
+        return Colors.orangeAccent;
       case 'completed':
       case 'closed':
         return Colors.grey;
@@ -180,6 +194,8 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
         return 'В пути';
       case 'pending':
         return 'На рассмотрении';
+      case 'awaiting_confirmation':
+        return 'Ожидает подтверждения';
       case 'completed':
         return 'Завершён';
       case 'closed':
@@ -199,6 +215,13 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
         automaticallyImplyLeading: false,
         title: const Text('Мои заявки',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _refreshRequests,
+            tooltip: 'Обновить',
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshRequests,
@@ -243,7 +266,7 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
         onTap: !isTappable
             ? null
             : () async {
-                final result = await Navigator.push(
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => OrderDetailPage(
@@ -252,7 +275,8 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
                     ),
                   ),
                 );
-                if (result == true && mounted) {
+                // Обновляем данные при возврате (независимо от результата)
+                if (mounted) {
                   _refreshRequests();
                 }
               },
