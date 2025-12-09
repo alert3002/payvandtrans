@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'main_screen.dart';
 import 'constants/api_constants.dart';
 import 'services/push_notification_service.dart';
+import 'package:sms_autofill/sms_autofill.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -18,7 +19,7 @@ class OtpScreen extends StatefulWidget {
   State<OtpScreen> createState() => _OtpScreenState();
 }
 
-class _OtpScreenState extends State<OtpScreen> {
+class _OtpScreenState extends State<OtpScreen> with CodeAutoFill {
   final _formKey = GlobalKey<FormState>();
   final List<TextEditingController> _controllers =
       List.generate(4, (_) => TextEditingController());
@@ -34,14 +35,44 @@ class _OtpScreenState extends State<OtpScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    _listenForSms();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNodes[0].requestFocus();
     });
   }
 
+  // Автоматическое заполнение SMS кода
+  void _listenForSms() async {
+    try {
+      await SmsAutoFill().listenForCode();
+    } catch (e) {
+      print('Ошибка при инициализации SMS автозаполнения: $e');
+    }
+  }
+
+  @override
+  void codeUpdated() {
+    if (code != null && code!.length == 4) {
+      // Заполняем поля автоматически
+      for (int i = 0; i < 4 && i < _controllers.length; i++) {
+        _controllers[i].text = code![i];
+      }
+      // Автоматически подтверждаем код
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _verifyOtp();
+      });
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel(); // Отменяем таймер для избежания утечек памяти
+    try {
+      SmsAutoFill().unregisterListener();
+      cancel();
+    } catch (e) {
+      print('Ошибка при отмене SMS автозаполнения: $e');
+    }
     for (var controller in _controllers) {
       controller.dispose();
     }
@@ -264,9 +295,20 @@ class _OtpScreenState extends State<OtpScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 40),
-                const Text(
-                  'Код подтверждения был\nотправлен по смс на номер:',
-                  style: TextStyle(color: Colors.white, fontSize: 22),
+                Center(
+                  child: Text(
+                    'Код подтверждения был отправлен по смс на номер',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    widget.phoneNumber,
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 40),
                 Row(

@@ -11,6 +11,8 @@ import 'auth_screen.dart';
 import 'models/city_model.dart'; // Убедитесь, что этот файл есть и класс City реализован
 import 'constants/api_constants.dart';
 import 'my_reviews_page.dart';
+import 'notifications_history_page.dart';
+import 'services/push_notification_service.dart';
 
 // =======================================================================
 // ProfilePage
@@ -28,12 +30,34 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _userRole;
   String? _balance;
   String? _photoUrl;
-  int? _userId;
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    _setupNotificationListeners();
+  }
+  
+  void _setupNotificationListeners() {
+    // Устанавливаем callback для обновления баланса при получении уведомления
+    PushNotificationService.onBalanceUpdate = (Map<String, dynamic> data) {
+      if (mounted && _userRole == 'driver') {
+        final balance = data['balance'] ?? data['remaining_balance'] ?? data['current_balance'];
+        if (balance != null) {
+          setState(() {
+            _balance = balance.toString();
+          });
+          print('✅ Баланс обновлен через уведомление: $_balance смн');
+        }
+      }
+    };
+  }
+  
+  @override
+  void dispose() {
+    // Очищаем callback при закрытии страницы
+    PushNotificationService.onBalanceUpdate = null;
+    super.dispose();
   }
 
   Future<void> _loadInitialData() async {
@@ -61,7 +85,6 @@ class _ProfilePageState extends State<ProfilePage> {
           _fullName = data['user']?['full_name'] ?? 'Имя не указано';
           _phone = data['user']?['phone'] ?? '';
           _photoUrl = data['photo'];
-          _userId = data['user']?['id'];
           if (_userRole == 'driver' && data['balance'] != null) {
             _balance = data['balance'].toString();
           }
@@ -236,16 +259,15 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 16),
             
-            // Кнопка "Уведомления" (информационная)
+            // Кнопка "История уведомлений"
             _buildMenuItem(
               icon: Icons.notifications_active,
-              text: 'Push-уведомления',
+              text: 'История уведомлений',
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Push-уведомления включены. Вы будете получать уведомления о новых заказах и изменениях статусов.'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 3),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsHistoryPage(),
                   ),
                 );
               },

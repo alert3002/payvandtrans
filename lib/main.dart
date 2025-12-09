@@ -2,18 +2,81 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:firebase_core/firebase_core.dart';
+// 👈 БАСТАҲОИ FCM-ро ИЛОВА КУНЕД
+import 'package:firebase_messaging/firebase_messaging.dart'; 
+import 'package:flutter/foundation.dart';
+// ------------------------------------------------------------------
+
 import 'auth_screen.dart';
-import 'main_screen.dart'; // <-- 1. IMPORT-И НАВ ИЛОВА ШУД
+import 'main_screen.dart'; 
+
+// 1. 👈 ФУНКСИЯИ КОРКАРДИ ПАЁМҲОИ ЗАМИНА (TOP LEVEL FUNCTION)
+// Ин функсия бояд берун аз ҳамаи синфҳо ва дар дохили main.dart бошад.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Агар лозим ояд, Firebase-ро дубора оғоз кунед (вақте ки замима пурра баста аст)
+  await Firebase.initializeApp(); 
+  
+  if (kDebugMode) {
+    print("✅ Handling a background message: ${message.messageId}");
+    print("Data: ${message.data}");
+    print("Notification: ${message.notification?.title}");
+  }
+  // Дар ин ҷо шумо метавонед логикаи коркарди паёмро (масалан, захира ба локалӣ) илова кунед
+}
+// ------------------------------------------------------------------
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Инициализация Firebase
   try {
+    // Для Android с google-services.json можно вызывать без опций
+    // Firebase автоматически найдет конфигурацию из google-services.json
+    // Для Web может потребоваться firebase_options.dart (но мы фокусируемся на Android)
     await Firebase.initializeApp();
-    print('✅ Firebase инициализирован успешно');
-  } catch (e) {
-    print('⚠️ Ошибка инициализации Firebase: $e');
+    
+    if (kDebugMode) {
+      print('✅ Firebase.initializeApp() вызван');
+      
+      // Проверяем, что Firebase действительно инициализирован
+      try {
+        final apps = Firebase.apps;
+        print('📱 Firebase Apps: ${apps.length}');
+        if (apps.isNotEmpty) {
+          final defaultApp = Firebase.app();
+          print('📱 Default App: ${defaultApp.name}');
+          print('📱 App Options: ${defaultApp.options.appId}');
+        } else {
+          print('⚠️ Firebase Apps пуст - возможно ошибка инициализации');
+        }
+      } catch (e) {
+        print('❌ Ошибка проверки Firebase Apps: $e');
+      }
+    }
+    
+    // 2. 👈 КОРКАРДИ ПАЁМҲОИ ЗАМИНА (Background Message Handler)
+    // Регистрируем обработчик ДО запуска приложения
+    // Только для мобильных платформ (не Web)
+    if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      if (kDebugMode) {
+        print('✅ Background message handler зарегистрирован');
+      }
+    }
+    
+  } catch (e, stackTrace) {
+    if (kDebugMode) {
+      print('❌ Ошибка инициализации Firebase: $e');
+      print('Stack trace: $stackTrace');
+      print('💡 Убедитесь, что:');
+      print('   1. google-services.json находится в android/app/');
+      print('   2. Package name совпадает с applicationId');
+      print('   3. Google Services plugin применен в build.gradle.kts');
+    }
+    // Продолжаем запуск приложения даже при ошибке Firebase
+    // Пользователь увидит ошибку при попытке получить токен
   }
   
   runApp(const MyApp());

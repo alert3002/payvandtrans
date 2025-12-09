@@ -1,9 +1,12 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.payvandtrans.app">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- SMS Autofill (SMS Retriever API не требует RECEIVE_SMS) -->
     <application
     android:name=".MainApplication"
     android:label="Payvandtrans"
@@ -33,6 +36,30 @@
     <meta-data 
         android:name="com.yandex.mapkit.ApiKey"
         android:value="d5e38efa-ec24-409f-9336-81be148be796" />
+
+    <!-- Firebase Cloud Messaging Service -->
+    <service
+        android:name="com.google.firebase.messaging.FirebaseMessagingService"
+        android:exported="false">
+        <intent-filter>
+            <action android:name="com.google.firebase.MESSAGING_EVENT" />
+        </intent-filter>
+    </service>
+
+    <!-- Default Notification Channel for Android 8.0+ -->
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="high_importance_channel" />
+
+    <!-- Default Notification Icon -->
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_icon"
+        android:resource="@mipmap/launcher_icon" />
+
+    <!-- Default Notification Color -->
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_color"
+        android:resource="@android:color/transparent" />
 </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

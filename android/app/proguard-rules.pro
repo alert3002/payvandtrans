@@ -105,6 +105,21 @@
 
 # ====================================
 
+# === ҚОИДАҲО БАРОИ FIREBASE (FCM) ===
+# Ин қоидаҳо ба R8 намегузоранд, ки классҳои муҳими Firebase-ро нест кунад.
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
+
+# Keep Firebase Messaging classes
+-keep class com.google.firebase.messaging.** { *; }
+-keep class com.google.firebase.iid.** { *; }
+
+# Keep Firebase Analytics (if used)
+-keep class com.google.firebase.analytics.** { *; }
+# ====================================
+
 # === ҚОИДАҲО БАРОИ YANDEX MAPKIT ===
 # Ин қоидаҳо ба R8 намегузоранд, ки классҳои муҳими Yandex-ро нест кунад.
 -keep class com.yandex.mapkit.** { *; }

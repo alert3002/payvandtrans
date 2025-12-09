@@ -2,10 +2,18 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+// 👈 ИН БАСТАҲОРО ИЛОВА КУНЕД
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
+// -----------------------------------------------------
+
 import 'models/request_model.dart';
 import 'order_detail_page.dart';
 import 'filter_page.dart';
 import 'constants/api_constants.dart';
+import 'notifications_history_page.dart';
+import 'services/push_notification_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,12 +25,128 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String? _userRole;
   late Future<List<Request>> _requestsFuture;
-  FilterSettings? _currentFilters;
+
+  // -----------------------------------------------------
+  // 👈 ФУНКСИЯИ ГИРИФТАНИ ТОКЕН (FCM Token Retrieval Function)
+  // -----------------------------------------------------
+  Future<void> getDeviceToken() async {
+    // Проверяем платформу - FCM работает только на мобильных устройствах
+    if (kIsWeb) {
+      if (kDebugMode) {
+        print('⚠️ FCM не поддерживается на Web платформе');
+      }
+      return;
+    }
+
+    try {
+      // 0. Проверяем, что Firebase инициализирован
+      try {
+        final apps = Firebase.apps;
+        if (apps.isEmpty) {
+          if (kDebugMode) {
+            print('⚠️ Firebase не инициализирован. Ожидание инициализации...');
+          }
+          // Ждем немного и пробуем инициализировать
+          await Future.delayed(const Duration(seconds: 1));
+          await Firebase.initializeApp();
+          
+          if (kDebugMode) {
+            print('✅ Firebase инициализирован после задержки');
+          }
+        } else {
+          if (kDebugMode) {
+            print('✅ Firebase уже инициализирован (${apps.length} app(s))');
+          }
+        }
+      } catch (e, stackTrace) {
+        if (kDebugMode) {
+          print('❌ Ошибка проверки/инициализации Firebase: $e');
+          print('Stack trace: $stackTrace');
+        }
+        return;
+      }
+
+      // 1. Иҷозат талаб карда мешавад (муҳим барои iOS ва Android 13+)
+      NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+      
+      if (kDebugMode) {
+        print('📱 Notification Permission Status: ${settings.authorizationStatus}');
+      }
+      
+      if (settings.authorizationStatus == AuthorizationStatus.authorized || 
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+        
+        // 2. Небольшая задержка для гарантии готовности Firebase
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // 3. Токен гирифта мешавад
+        String? token = await FirebaseMessaging.instance.getToken();
+        
+        if (token != null && token.isNotEmpty) {
+          // 4. Токен дар консол чоп мешавад
+          if (kDebugMode) {
+            print('✅ FCM TOKEN: $token'); 
+            print('📋 Скопируйте этот токен для тестирования в Firebase Console');
+          }
+          
+          // 5. Токенро ба сервери худ фиристед, агар лозим бошад
+          // (PushNotificationService уже делает это автоматически)
+        } else {
+          if (kDebugMode) {
+            print('❌ FCM TOKEN: Токен гирифта нашуд (null ё холӣ).');
+            print('💡 Проверьте:');
+            print('   1. google-services.json в android/app/');
+            print('   2. Package name совпадает с applicationId');
+            print('   3. Интернет соединение активно');
+          }
+        }
+      } else {
+        if (kDebugMode) {
+          print('⚠️ FCM: Иҷозати огоҳинома рад карда шуд: ${settings.authorizationStatus}');
+        }
+      }
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('❌ Хатогӣ ҳангоми гирифтани токен: $e');
+        print('Stack trace: $stackTrace');
+      }
+    }
+  }
+
+  // -----------------------------------------------------
+  
   @override
   void initState() {
     super.initState();
     _requestsFuture = Future.value([]);
+    // 👈 ДАЪВАТИ ФУНКСИЯИ ГИРИФТАНИ ТОКЕН:
+    getDeviceToken(); 
+    // ---------------------------------------
     _loadUserRoleAndFetchData();
+    _setupNotificationListeners();
+  }
+  
+  void _setupNotificationListeners() {
+    // Обновляем список заявок при получении уведомления о статусе
+    PushNotificationService.onRequestStatusUpdate = () {
+      if (mounted) {
+        setState(() {
+          _requestsFuture = _fetchRequests();
+        });
+      }
+    };
+  }
+  
+  @override
+  void dispose() {
+    // Очищаем callback при закрытии страницы
+    PushNotificationService.onRequestStatusUpdate = null;
+    super.dispose();
   }
 
   Future<void> _loadUserRoleAndFetchData() async {
@@ -35,6 +159,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ... (боқимондаи коди шумо бе тағйир мемонад)
+  
   Future<List<Request>> _fetchRequests() async {
     final isDriver = _userRole == 'driver';
     final url = isDriver
@@ -86,7 +212,6 @@ class _HomePageState extends State<HomePage> {
 
     if (result != null) {
       setState(() {
-        _currentFilters = result;
         _requestsFuture =
             _fetchRequests(); // Рӯйхатро бо филтрҳои нав аз нав боргирӣ мекунем
       });
@@ -183,16 +308,15 @@ class _HomePageState extends State<HomePage> {
           IconButton(
               icon: const Icon(Icons.notifications_active, color: Colors.white),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Push-уведомления включены. Вы будете получать уведомления о новых заказах и изменениях статусов.'),
-                    backgroundColor: Colors.green,
-                    duration: Duration(seconds: 3),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsHistoryPage(),
                   ),
                 );
               },
-              tooltip: 'Push-уведомления',
-          ),
+              tooltip: 'История уведомлений',
+            ),
           const SizedBox(width: 5),
         ],
       ),
@@ -238,7 +362,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // === ФУНКСИЯИ ИСЛОҲШУДА ===
   Widget _buildDriverRequestCard(Request request) {
     final bool isTappable = request.id != null;
     return InkWell(

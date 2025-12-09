@@ -1,13 +1,24 @@
-// Файли: android/app/build.gradle.kts (Версияи пурраи ислоҳшуда)
-// Ин файл барои сохтмони муваффақ дар маҳаллӣ (бо key.properties) ва дар Codemagic (бо Environment Variables) танзим шудааст.
 
 import java.util.Properties
 import java.io.FileInputStream
+
+buildscript {
+    val kotlin_version = "1.9.23"
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.2.0")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
+    }
+}
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
 fun localProperties(): Properties {
@@ -32,7 +43,7 @@ val localProps = localProperties()
 // Боварӣ ҳосил кунед, ки version code ва version name дуруст муайян шудаанд
 // Поёнӣ як арзиши пешфарзро таъмин мекунад; Play Console ба шумо талаб мекунад версияҳои навро яхд карда
 // барои интишор — инро ба 5 бадахшам (requested by Play Console).
-val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "7").toString()
+val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "8").toString()
 val flutterVersionName = (project.findProperty("flutter.versionName") ?: "1.0.1").toString()
 
 android {
@@ -43,6 +54,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+        // Core library desugaring требуется для flutter_local_notifications
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -85,6 +98,13 @@ android {
     // ==========================================================
 
     buildTypes {
+    getByName("debug") {
+        // Debug build configuration
+        isDebuggable = true
+        isMinifyEnabled = false
+        isShrinkResources = false
+    }
+    
     getByName("release") {
         // === ҚИСМИ 3: Пайваст кардани конфигуратсияи имзокунии release ===
         val keystorePath = keystoreProperties.getProperty("storeFile") ?: ""
@@ -125,5 +145,13 @@ flutter {
 }
 
 dependencies {
-
+    // Firebase BOM для управления версиями всех Firebase библиотек
+    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+    
+    // Firebase Cloud Messaging
+    // firebase-core больше не нужен в новых версиях Firebase (включен автоматически)
+    implementation("com.google.firebase:firebase-messaging")
+    
+    // Core library desugaring для flutter_local_notifications
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

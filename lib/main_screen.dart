@@ -49,6 +49,16 @@ class _MainScreenState extends State<MainScreen> {
     if (token != null && mounted) {
       try {
         await PushNotificationService.initPushNotifications(context);
+        
+        // Устанавливаем callback для обновления UI при получении уведомлений
+        PushNotificationService.onRequestStatusUpdate = () {
+          // Обновляем данные на всех страницах при изменении статуса
+          if (mounted) {
+            setState(() {
+              // Триггерим обновление страниц
+            });
+          }
+        };
       } catch (e) {
         print('⚠️ Ошибка инициализации push-уведомлений: $e');
       }
