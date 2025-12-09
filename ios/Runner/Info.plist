@@ -61,5 +61,27 @@
 
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    
+    <!-- Разрешения для Firebase и Push Notifications -->
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>remote-notification</string>
+    </array>
+    
+    <!-- Разрешение на использование камеры (если используется image_picker) -->
+    <key>NSCameraUsageDescription</key>
+    <string>Приложению необходим доступ к камере для добавления фотографий</string>
+    
+    <!-- Разрешение на использование фотобиблиотеки -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Приложению необходим доступ к фотобиблиотеке для выбора изображений</string>
+    
+    <!-- Разрешение на использование локации (если используется) -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Приложению необходим доступ к вашей локации для определения маршрута</string>
+    
+    <!-- Разрешение на использование локации в фоне (если используется) -->
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Приложению необходим доступ к вашей локации для определения маршрута</string>
   </dict>
 </plist>

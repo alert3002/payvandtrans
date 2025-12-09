@@ -32,10 +32,13 @@ void main() async {
   
   // Инициализация Firebase
   try {
-    // Для Android с google-services.json можно вызывать без опций
-    // Firebase автоматически найдет конфигурацию из google-services.json
-    // Для Web может потребоваться firebase_options.dart (но мы фокусируемся на Android)
-    await Firebase.initializeApp();
+    // Проверяем, не инициализирован ли Firebase уже (например, в AppDelegate для iOS)
+    if (Firebase.apps.isEmpty) {
+      // Для Android с google-services.json можно вызывать без опций
+      // Firebase автоматически найдет конфигурацию из google-services.json
+      // Для iOS Firebase уже инициализирован в AppDelegate.swift
+      await Firebase.initializeApp();
+    }
     
     if (kDebugMode) {
       print('✅ Firebase.initializeApp() вызван');

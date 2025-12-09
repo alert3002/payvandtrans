@@ -8,8 +8,11 @@ import FirebaseCore
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    // Инициализация Firebase
-    FirebaseApp.configure()
+    // Инициализация Firebase для iOS
+    // Firebase будет инициализирован здесь, а в main.dart будет проверка на уже инициализированный Firebase
+    if FirebaseApp.app() == nil {
+      FirebaseApp.configure()
+    }
     
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
