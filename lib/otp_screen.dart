@@ -8,6 +8,7 @@ import 'main_screen.dart';
 import 'constants/api_constants.dart';
 import 'services/push_notification_service.dart';
 import 'package:sms_autofill/sms_autofill.dart';
+import 'package:flutter/foundation.dart'; //
 
 class OtpScreen extends StatefulWidget {
   final String phoneNumber;
@@ -210,18 +211,25 @@ class _OtpScreenState extends State<OtpScreen> with CodeAutoFill {
 
       if (response.statusCode == 200 && responseData['success'] == true) {
         final accessToken = responseData['access'];
+        // 👈 ИН САТР ИЛОВА ШУД (Refresh Token-ро гиред)
+        final refreshToken = responseData['refresh']; 
         final userRole = responseData['role'];
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', accessToken);
         await prefs.setString('role', userRole);
+        // 👈 REFRESH TOKEN-ро ЗАХИРА КУНЕД
+        if (refreshToken != null) {
+          await prefs.setString('refresh_token', refreshToken);
+        }
 
         if (mounted) {
-          // ✅ ИСЛОҲ ШУД: Гузариш ба MainScreen танҳо дар ҳолати муваффақият
-          
-          // Инициализация push-уведомлений после успешного входа
+          // Инициализация push-уведомлений пас аз воридшавии муваффақ
           try {
-            await PushNotificationService.initPushNotifications(context);
+            // 👈 САНҶИШИ ПЛАТФОРМА: Танҳо дар мобилӣ иҷро кунед
+            if (!kIsWeb) {
+              await PushNotificationService.initPushNotifications(context);
+            }
           } catch (e) {
             print('⚠️ Ошибка инициализации push-уведомлений: $e');
           }

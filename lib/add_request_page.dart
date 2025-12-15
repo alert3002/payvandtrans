@@ -426,14 +426,13 @@ class _AddRequestPageState extends State<AddRequestPage> {
   }
 
   Future<List<TransportCategory>> _fetchTransportCategories() async {
-    final data = await _fetchPaginatedData(
-        ApiConstants.getUrl('api/transports/'));
+    final data =
+        await _fetchPaginatedData(ApiConstants.getUrl('api/transports/'));
     return data.map((json) => TransportCategory.fromJson(json)).toList();
   }
 
   Future<List<City>> _fetchCities() async {
-    final data =
-        await _fetchPaginatedData(ApiConstants.getUrl('api/cities/'));
+    final data = await _fetchPaginatedData(ApiConstants.getUrl('api/cities/'));
     final list = data.map((json) => City.fromJson(json)).toList();
     // Обновляем локальный кеш для поиска по id
     _citiesCache = list;

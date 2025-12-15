@@ -7,7 +7,8 @@ class NotificationsHistoryPage extends StatefulWidget {
   const NotificationsHistoryPage({super.key});
 
   @override
-  State<NotificationsHistoryPage> createState() => _NotificationsHistoryPageState();
+  State<NotificationsHistoryPage> createState() =>
+      _NotificationsHistoryPageState();
 }
 
 class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
@@ -66,7 +67,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена', style: TextStyle(color: Colors.white70)),
+            child:
+                const Text('Отмена', style: TextStyle(color: Colors.white70)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -95,7 +97,7 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
       } else if (item.data!.containsKey('order_id')) {
         requestId = int.tryParse(item.data!['order_id'].toString());
       }
-      
+
       final userRole = item.data!['user_role'] ?? 'driver';
 
       if (requestId != null && requestId > 0) {
@@ -135,16 +137,16 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
 
   String _getStatusText(Map<String, dynamic>? data, String title) {
     if (data == null) return '';
-    
+
     // Извлекаем информацию о статусе из данных уведомления
     final status = data['status'] ?? data['new_status'] ?? '';
     final oldStatus = data['old_status'] ?? '';
     final orderId = data['order_id'] ?? data['request_id'] ?? '';
     final notificationType = data['type'] ?? data['notification_type'] ?? '';
     final titleLower = title.toLowerCase();
-    
+
     // Специальные типы уведомлений
-    if (notificationType == 'driver_found' || 
+    if (notificationType == 'driver_found' ||
         titleLower.contains('водитель найден')) {
       final carNumber = data['car_number'] ?? data['carNumber'] ?? '';
       if (carNumber.toString().isNotEmpty) {
@@ -152,7 +154,7 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
       }
       return 'Водитель найден для заявки #$orderId';
     }
-    
+
     if (notificationType == 'car_departed' ||
         titleLower.contains('машина выехала')) {
       final carNumber = data['car_number'] ?? data['carNumber'] ?? '';
@@ -161,13 +163,13 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
       }
       return 'Машина выехала к заявке #$orderId';
     }
-    
+
     if (status == 'rejected' || oldStatus == 'rejected') {
       return '❌ Заявка #$orderId отклонена';
     }
-    
+
     // Обработка уведомлений о балансе
-    if (notificationType == 'balance_update' || 
+    if (notificationType == 'balance_update' ||
         notificationType == 'balance_replenished' ||
         notificationType == 'balance_deducted' ||
         titleLower.contains('баланс')) {
@@ -182,7 +184,7 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
       }
       return '';
     }
-    
+
     if (status == 'active') {
       // Статус актив (независимо от старого статуса)
       if (oldStatus == 'pending') {
@@ -191,7 +193,7 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
         return '✅ Заявка #$orderId стала активной';
       }
     }
-    
+
     if (status.isNotEmpty && oldStatus.isNotEmpty && status != oldStatus) {
       return 'Заявка #$orderId: $oldStatus → $status';
     } else if (status.isNotEmpty && orderId.isNotEmpty) {
@@ -199,53 +201,58 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
     } else if (orderId.isNotEmpty) {
       return 'Заявка #$orderId';
     }
-    
+
     return '';
   }
-  
-  IconData _getNotificationIcon(Map<String, dynamic>? data, String title, String body) {
+
+  IconData _getNotificationIcon(
+      Map<String, dynamic>? data, String title, String body) {
     if (data == null) return Icons.notifications;
-    
+
     final status = data['status'] ?? data['new_status'] ?? '';
     final notificationType = data['type'] ?? data['notification_type'] ?? '';
     final titleLower = title.toLowerCase();
     final bodyLower = body.toLowerCase();
-    
+
     // Уведомления о балансе
-    if (notificationType == 'balance_update' || 
+    if (notificationType == 'balance_update' ||
         notificationType == 'balance_replenished' ||
         notificationType == 'balance_deducted' ||
         titleLower.contains('баланс') ||
         bodyLower.contains('баланс')) {
       if (titleLower.contains('пополнен') || bodyLower.contains('пополнен')) {
         return Icons.add_circle;
-      } else if (titleLower.contains('минус') || bodyLower.contains('минус') ||
-                 titleLower.contains('списан') || bodyLower.contains('списан')) {
+      } else if (titleLower.contains('минус') ||
+          bodyLower.contains('минус') ||
+          titleLower.contains('списан') ||
+          bodyLower.contains('списан')) {
         return Icons.remove_circle;
       }
       return Icons.account_balance_wallet;
     }
-    
-    if (notificationType == 'driver_found' || titleLower.contains('водитель найден')) {
+
+    if (notificationType == 'driver_found' ||
+        titleLower.contains('водитель найден')) {
       return Icons.person_add;
     }
-    
-    if (notificationType == 'car_departed' || titleLower.contains('машина выехала')) {
+
+    if (notificationType == 'car_departed' ||
+        titleLower.contains('машина выехала')) {
       return Icons.directions_car;
     }
-    
+
     if (status == 'rejected' || titleLower.contains('отклонен')) {
       return Icons.cancel;
     }
-    
+
     if (status == 'active' || titleLower.contains('актив')) {
       return Icons.check_circle;
     }
-    
+
     if (titleLower.contains('статус') || status.isNotEmpty) {
       return Icons.info;
     }
-    
+
     return Icons.notifications;
   }
 
@@ -309,7 +316,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                     itemBuilder: (context, index) {
                       final item = _notifications[index];
                       final statusText = _getStatusText(item.data, item.title);
-                      final icon = _getNotificationIcon(item.data, item.title, item.body);
+                      final icon = _getNotificationIcon(
+                          item.data, item.title, item.body);
 
                       return GestureDetector(
                         onTap: () => _handleNotificationTap(item),
@@ -324,7 +332,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                             border: item.isRead
                                 ? null
                                 : Border.all(
-                                    color: const Color(0xFFdcd232).withOpacity(0.3),
+                                    color: const Color(0xFFdcd232)
+                                        .withOpacity(0.3),
                                     width: 1,
                                   ),
                           ),
@@ -338,7 +347,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFdcd232).withOpacity(0.2),
+                                      color: const Color(0xFFdcd232)
+                                          .withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Icon(
@@ -350,7 +360,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           item.title,
@@ -380,7 +391,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                                             decoration: BoxDecoration(
                                               color: const Color(0xFFdcd232)
                                                   .withOpacity(0.2),
-                                              borderRadius: BorderRadius.circular(6),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
                                             child: Text(
                                               statusText,
@@ -408,7 +420,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                               ),
                               const SizedBox(height: 12),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     _formatTimestamp(item.timestamp),
@@ -426,7 +439,8 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                                           vertical: 4,
                                         ),
                                         minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
                                       child: const Text(
                                         'Отметить как прочитанное',
@@ -448,4 +462,3 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
     );
   }
 }
-
