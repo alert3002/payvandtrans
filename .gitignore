@@ -1,4 +1,6 @@
 # Miscellaneous
+# macOS resource fork files (._*) - break Codemagic/iOS builds
+**/._*
 *.class
 *.log
 *.pyc

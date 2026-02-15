@@ -9,6 +9,8 @@
 .tags*
 **/.vagrant/
 **/DerivedData/
+# macOS resource fork files - break Codemagic code signing
+**/._*
 Icon?
 **/Pods/
 **/.symlinks/
