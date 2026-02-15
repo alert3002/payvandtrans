@@ -1,5 +1,6 @@
 
 import java.util.Properties
+import java.io.File
 import java.io.FileInputStream
 
 buildscript {
@@ -127,10 +128,9 @@ android {
             println("WARNING: Release signing skipped. Keystore path is empty in key.properties")
         }
 
-        // Барои тест кардан, минфикатсияро хомуш карда метавонем
-        // Агар хатоги боқӣ монд, инро ба true баргардонед
-        isMinifyEnabled = true
-        isShrinkResources = true
+        // Minification хомуш — барои release APK (гардиш: R8 метавонад APK-ро нест кунад)
+        isMinifyEnabled = false
+        isShrinkResources = false
 
         proguardFiles(
             getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -142,6 +142,50 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// Барои Flutter: APK-ро ба ҷойи интизори барнома копия мекунем (барои "couldn't find it")
+afterEvaluate {
+    val flutterProjectRoot = rootProject.projectDir.parentFile!!
+    val apkOutDir = File(flutterProjectRoot, "build/app/outputs/flutter-apk")
+
+    tasks.named("assembleDebug").configure {
+        doLast {
+            val debugApk = file("$buildDir/outputs/apk/debug/app-debug.apk")
+            if (debugApk.exists()) {
+                apkOutDir.mkdirs()
+                debugApk.copyTo(File(apkOutDir, "app-debug.apk"), overwrite = true)
+                println("Copied debug APK to ${File(apkOutDir, "app-debug.apk")}")
+            }
+        }
+    }
+
+    tasks.named("assembleRelease").configure {
+        doLast {
+            val releaseApk = file("$buildDir/outputs/apk/release/app-release.apk")
+            if (releaseApk.exists()) {
+                apkOutDir.mkdirs()
+                releaseApk.copyTo(File(apkOutDir, "app-release.apk"), overwrite = true)
+                println("Copied release APK to ${File(apkOutDir, "app-release.apk")}")
+            } else {
+                println("WARNING: Release APK not found at $releaseApk")
+            }
+        }
+    }
+
+    val bundleOutDir = File(flutterProjectRoot, "build/app/outputs/bundle/release")
+    tasks.named("bundleRelease").configure {
+        doLast {
+            val releaseAab = file("$buildDir/outputs/bundle/release/app-release.aab")
+            if (releaseAab.exists()) {
+                bundleOutDir.mkdirs()
+                releaseAab.copyTo(File(bundleOutDir, "app-release.aab"), overwrite = true)
+                println("Copied release AAB to ${File(bundleOutDir, "app-release.aab")}")
+            } else {
+                println("WARNING: Release AAB not found at $releaseAab")
+            }
+        }
+    }
 }
 
 dependencies {

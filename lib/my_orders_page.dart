@@ -81,8 +81,10 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
         return 'Актив';
       case 'in_transit':
         return 'В пути';
+      case 'awaiting':
+        return 'Ожидание';
       case 'awaiting_confirmation':
-        return 'Ожидание передачи заказа';
+        return 'Ожидает рассмотрения';
       case 'pending':
         return 'На рассмотрении';
       case 'closed':

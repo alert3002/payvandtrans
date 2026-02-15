@@ -34,33 +34,86 @@ class _RouteMapPageState extends State<RouteMapPage> {
     _setupMapPointsAndFetchRoute();
   }
 
+  String _formatStopAddress(dynamic stop) {
+    if (stop == null) return '—';
+    final parts = <String>[];
+    final cityVal = stop.city;
+    if (cityVal != null) {
+      final s = cityVal is Map ? (cityVal['name'] ?? cityVal).toString() : cityVal.toString();
+      if (s.trim().isNotEmpty) parts.add(s.trim());
+    }
+    final addr = stop.address?.toString().trim();
+    if (addr != null && addr.isNotEmpty) parts.add(addr);
+    final wh = stop.warehouse?.toString().trim();
+    if (wh != null && wh.isNotEmpty) parts.add(wh);
+    return parts.isEmpty ? '—' : parts.join(', ');
+  }
+
+  Future<void> _showAddressOnTap(String label, String address, LatLng? point) async {
+    String text = address;
+    if (text.isEmpty || text == '—') {
+      if (point != null) {
+        try {
+          final url = Uri.parse(
+              'https://nominatim.openstreetmap.org/reverse?lat=${point.latitude}&lon=${point.longitude}&format=json');
+          final resp = await http.get(url, headers: {'User-Agent': 'tj.payvandtrans.app/1.0'});
+          if (resp.statusCode == 200) {
+            final data = json.decode(resp.body);
+            text = data['display_name'] ?? '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+          } else {
+            text = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+          }
+        } catch (_) {
+          text = '${point.latitude.toStringAsFixed(5)}, ${point.longitude.toStringAsFixed(5)}';
+        }
+      }
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label: $text', style: const TextStyle(fontSize: 12)),
+        duration: const Duration(seconds: 4),
+        backgroundColor: const Color(0xFF2a2a2e),
+        action: SnackBarAction(label: 'OK', textColor: const Color(0xFFdcd232), onPressed: () {}),
+      ),
+    );
+  }
+
   Future<void> _setupMapPointsAndFetchRoute() async {
-    // Нуқтаҳои "Откуда"
+    // Нуқтаҳои "Откуда" (Точка А)
     for (var stop in widget.originStops) {
       if (stop.lat != null && stop.lng != null) {
         final point = LatLng(stop.lat!, stop.lng!);
+        final addr = _formatStopAddress(stop);
         _pointsForBounds.add(point);
         _markers.add(
           Marker(
             point: point,
             width: 80,
             height: 80,
-            child: const Icon(Icons.location_on, color: Colors.blue, size: 40),
+            child: GestureDetector(
+              onTap: () => _showAddressOnTap('Точка А (погрузка)', addr, point),
+              child: const Icon(Icons.location_on, color: Colors.blue, size: 40),
+            ),
           ),
         );
       }
     }
-    // Нуқтаҳои "Куда"
+    // Нуқтаҳои "Куда" (Точка Б)
     for (var stop in widget.destStops) {
       if (stop.lat != null && stop.lng != null) {
         final point = LatLng(stop.lat!, stop.lng!);
+        final addr = _formatStopAddress(stop);
         _pointsForBounds.add(point);
         _markers.add(
           Marker(
             point: point,
             width: 80,
             height: 80,
-            child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+            child: GestureDetector(
+              onTap: () => _showAddressOnTap('Точка Б (выгрузка)', addr, point),
+              child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+            ),
           ),
         );
       }

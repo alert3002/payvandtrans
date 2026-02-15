@@ -1,7 +1,8 @@
 class ApiConstants {
-  // Автоматическое определение базового URL в зависимости от платформы
+  // PRODUCTION: https://app.payvandtrans.com
+  // Локаль (dev): http://192.168.0.100:8000 ё http://127.0.0.1:8000
   static String get baseUrl {
-    return "https://app.payvandtrans.com";
+    return "https://app.payvandtrans.com";  // PRODUCTION
   }
 
   // Helper методы для удобства

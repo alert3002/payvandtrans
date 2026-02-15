@@ -93,6 +93,8 @@ class _AddRequestPageState extends State<AddRequestPage> {
     super.dispose();
   }
 
+  double _roundCoord(double v) => double.parse(v.toStringAsFixed(9));
+
   void _showErrorSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -104,21 +106,21 @@ class _AddRequestPageState extends State<AddRequestPage> {
 
   void _addStop({required bool isOrigin}) {
     setState(() {
-      if (isOrigin) {
-        if (_originStops.length < 4) {
+        if (isOrigin) {
+        if (_originStops.length < 6) {
           _originStops.add(Stop(
               addressController: TextEditingController(),
               warehouseController: TextEditingController()));
         } else {
-          _showErrorSnackBar('Максимум 4 адрес можно добавить.');
+          _showErrorSnackBar('Максимум 6 адресов можно добавить.');
         }
       } else {
-        if (_destinationStops.length < 4) {
+        if (_destinationStops.length < 6) {
           _destinationStops.add(Stop(
               addressController: TextEditingController(),
               warehouseController: TextEditingController()));
         } else {
-          _showErrorSnackBar('Максимум 4 адреса можно добавить.');
+          _showErrorSnackBar('Максимум 6 адресов можно добавить.');
         }
       }
     });
@@ -153,10 +155,11 @@ class _AddRequestPageState extends State<AddRequestPage> {
             .name;
     if (cityName.isEmpty) return;
 
-    final viewbox = '67.3,41.1,75.2,36.7'; // Сарҳади Тоҷикистон
+    // Тоҷикистон + Ӯзбекистон (Ташкент, Хуҷанд, Душанбе ва ғ.)
+    const countryCodes = 'tj,uz';
 
     final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(cityName)}&format=json&limit=1&viewbox=$viewbox&bounded=1&countrycodes=tj');
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(cityName)}&format=json&limit=5&countrycodes=$countryCodes');
 
     try {
       final response = await http
@@ -189,10 +192,10 @@ class _AddRequestPageState extends State<AddRequestPage> {
     if (stop.addressController.text.isEmpty || cityName.isEmpty) return;
 
     final fullAddress = "$cityName, ${stop.addressController.text}";
-    final viewbox = '67.3,41.1,75.2,36.7';
+    const countryCodes = 'tj,uz';
 
     final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(fullAddress)}&format=json&limit=1&viewbox=$viewbox&bounded=1&countrycodes=tj');
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(fullAddress)}&format=json&limit=5&countrycodes=$countryCodes');
 
     try {
       final response = await http
@@ -281,6 +284,9 @@ class _AddRequestPageState extends State<AddRequestPage> {
   }
 
   Future<void> _showMapDialog(Stop stop) async {
+    if ((stop.lat == null || stop.lng == null) && (stop.city != null || stop.cityId != null)) {
+      await _geocodeCityCenter(stop);
+    }
     final LatLng initialPoint = stop.lat != null && stop.lng != null
         ? LatLng(stop.lat!, stop.lng!)
         : const LatLng(38.8, 71.2);
@@ -347,10 +353,10 @@ class _AddRequestPageState extends State<AddRequestPage> {
           _tonnageController.text.isNotEmpty ? _tonnageController.text : null,
       'description': _descriptionController.text,
       'distance_km': _distanceKm,
-      'origin_lats': _originStops.map((stop) => stop.lat).toList(),
-      'origin_lngs': _originStops.map((stop) => stop.lng).toList(),
-      'dest_lats': _destinationStops.map((stop) => stop.lat).toList(),
-      'dest_lngs': _destinationStops.map((stop) => stop.lng).toList(),
+      'origin_lats': _originStops.map((s) => s.lat != null ? _roundCoord(s.lat!) : null).toList(),
+      'origin_lngs': _originStops.map((s) => s.lng != null ? _roundCoord(s.lng!) : null).toList(),
+      'dest_lats': _destinationStops.map((s) => s.lat != null ? _roundCoord(s.lat!) : null).toList(),
+      'dest_lngs': _destinationStops.map((s) => s.lng != null ? _roundCoord(s.lng!) : null).toList(),
     });
 
     try {
@@ -524,7 +530,7 @@ class _AddRequestPageState extends State<AddRequestPage> {
                       Stop stop = entry.value;
                       return _buildStopInputWidget(stop, idx, isOrigin: true);
                     }).toList(),
-                    if (_originStops.length < 4)
+                    if (_originStops.length < 6)
                       _buildAddButton(
                           onPressed: () => _addStop(isOrigin: true)),
                   ],
@@ -540,7 +546,7 @@ class _AddRequestPageState extends State<AddRequestPage> {
                       Stop stop = entry.value;
                       return _buildStopInputWidget(stop, idx, isOrigin: false);
                     }).toList(),
-                    if (_destinationStops.length < 4)
+                    if (_destinationStops.length < 6)
                       _buildAddButton(
                           onPressed: () => _addStop(isOrigin: false)),
                   ],
@@ -790,11 +796,15 @@ class _AddRequestPageState extends State<AddRequestPage> {
         Row(children: [
           Icon(icon, color: const Color(0xFFdcd232), size: 20),
           const SizedBox(width: 8),
-          Text(title,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(title,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1),
+          ),
         ]),
         const SizedBox(height: 12),
         child,

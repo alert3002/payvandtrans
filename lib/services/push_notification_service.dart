@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' if (dart.library.html) 'dart:html' as io;
+import 'platform_io_stub.dart' if (dart.library.io) 'platform_io.dart' as platform;
 import '../constants/api_constants.dart';
 import '../order_detail_page.dart';
 import 'notification_history_service.dart';
@@ -92,7 +92,7 @@ class PushNotificationService {
   static Future<void> _initializeLocalNotifications() async {
     // Проверяем платформу безопасно (без использования Platform на Web)
     if (kIsWeb) return;
-    if (!io.Platform.isAndroid) return;
+    if (!platform.platformIsAndroid) return;
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/launcher_icon');
@@ -150,12 +150,12 @@ class PushNotificationService {
         return;
       }
 
-      // Определяем тип устройства безопасно
-      String deviceType = 'android'; // По умолчанию для Android
+      // Определяем тип устройства безопасно (без dart:io на Web)
+      String deviceType = 'android';
       if (!kIsWeb) {
-        if (io.Platform.isIOS) {
+        if (platform.platformIsIOS) {
           deviceType = 'ios';
-        } else if (io.Platform.isAndroid) {
+        } else if (platform.platformIsAndroid) {
           deviceType = 'android';
         }
       }
@@ -169,7 +169,7 @@ class PushNotificationService {
         body: json.encode({
           'registration_id': token,
           'type': deviceType,
-          'name': kIsWeb ? 'Web Device' : '${io.Platform.operatingSystem} Device',
+          'name': kIsWeb ? 'Web Device' : '${platform.platformOperatingSystem} Device',
         }),
       );
 
@@ -231,7 +231,7 @@ class PushNotificationService {
       }
 
       // Показываем локальное уведомление для Android
-      if (!kIsWeb && io.Platform.isAndroid && message.notification != null) {
+      if (!kIsWeb && platform.platformIsAndroid && message.notification != null) {
         await _showLocalNotification(message);
       }
       
@@ -296,7 +296,7 @@ class PushNotificationService {
 
   /// Показ локального уведомления для Android
   static Future<void> _showLocalNotification(RemoteMessage message) async {
-    if (kIsWeb || !io.Platform.isAndroid || message.notification == null) return;
+    if (kIsWeb || !platform.platformIsAndroid || message.notification == null) return;
 
     final notification = message.notification!;
     final data = message.data;

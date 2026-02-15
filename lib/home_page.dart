@@ -191,7 +191,8 @@ class _HomePageState extends State<HomePage> {
             data.map((json) => Request.fromJson(json)).toList();
 
         if (!isDriver) {
-          allRequests.retainWhere((request) => request.status == 'active');
+          allRequests.retainWhere((r) =>
+              r.status == 'active' );
         }
 
         return allRequests;
@@ -246,6 +247,8 @@ class _HomePageState extends State<HomePage> {
         return Colors.orangeAccent;
       case 'pending':
         return Colors.orangeAccent;
+      case 'awaiting':
+        return Colors.amberAccent;
       case 'in_transit':
         return Colors.blueAccent;
       case 'closed':
@@ -262,9 +265,11 @@ class _HomePageState extends State<HomePage> {
       case 'active':
         return 'Актив';
       case 'awaiting_confirmation':
-        return 'Ожидает подтверждения';
+        return 'Ожидает рассмотрения';
       case 'pending':
         return 'На рассмотрении';
+      case 'awaiting':
+        return 'Ожидание';
       case 'in_transit':
         return 'В пути';
       case 'closed':

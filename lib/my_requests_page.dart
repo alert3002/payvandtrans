@@ -175,9 +175,10 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
       case 'in_transit':
         return Colors.blueAccent;
       case 'pending':
-        return Colors.orangeAccent;
       case 'awaiting_confirmation':
         return Colors.orangeAccent;
+      case 'awaiting':
+        return Colors.amberAccent;
       case 'completed':
       case 'closed':
         return Colors.grey;
@@ -195,7 +196,9 @@ class _MyRequestsPageState extends State<MyRequestsPage> {
       case 'pending':
         return 'На рассмотрении';
       case 'awaiting_confirmation':
-        return 'Ожидает подтверждения';
+        return 'Ожидает рассмотрения';
+      case 'awaiting':
+        return 'Ожидание';
       case 'completed':
         return 'Завершён';
       case 'closed':

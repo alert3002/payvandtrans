@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:my_app/transport_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +12,8 @@ import 'constants/api_constants.dart';
 import 'leave_review_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'driver_tracking_page.dart';
+import 'driver_route_map_page.dart';
 
 
 
@@ -47,6 +51,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   String _commissionText = '0.00 смн';
 
+  Timer? _locationTimer;
+
 
 
   @override
@@ -64,15 +70,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
 
   @override
-
   void dispose() {
-
     _priceController.removeListener(_validateAndCalculateCommission);
-
     _priceController.dispose();
-
+    _locationTimer?.cancel();
     super.dispose();
-
   }
 
 
@@ -158,15 +160,40 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       }
 
     } catch (e) {
-
       print("Error fetching data: $e");
-
     } finally {
-
-      if (mounted) setState(() => _isLoading = false);
-
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _maybeStartLocationUpdates();
+      }
     }
+  }
 
+  void _maybeStartLocationUpdates() {
+    _locationTimer?.cancel();
+    if (widget.userRole != 'driver' || _myBidStatus == null) return;
+    if (!['in_transit', 'active', 'awaiting'].contains(_requestData?.status)) return;
+    final bidStatus = _myBidStatus!['status']?.toString().toLowerCase();
+    if (bidStatus != 'accepted' && bidStatus != 'active') return;
+    _sendLocationOnce();
+    _locationTimer = Timer.periodic(const Duration(seconds: 15), (_) => _sendLocationOnce());
+  }
+
+  Future<void> _sendLocationOnce() async {
+    if (!mounted) return;
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token == null) return;
+      await http.post(
+        ApiConstants.getUri('api/requests/${widget.requestId}/update_location/'),
+        headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
+        body: json.encode({'lat': pos.latitude, 'lng': pos.longitude}),
+      );
+    } catch (_) {}
   }
 
 
@@ -342,29 +369,13 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         await _fetchData();
 
       } else if (response.statusCode == 400 && responseBody['message'] == 'Баланс недостаточен') {
-
-        showDialog(
-
-          context: context,
-
-          builder: (ctx) => AlertDialog(
-
-            title: const Text('Ошибка'),
-
-            content: const Text('Уважаемый водитель, ваш баланс недостаточен для списания комиссии.'),
-
-            actions: [
-
-              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
-
-              TextButton(onPressed: () { Navigator.of(ctx).pop(); Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BalancePage())).then((_) => _fetchData()); }, child: const Text('Пополнить баланс')),
-
-            ],
-
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Баланс недостаточен. Пополните баланс.'),
+            backgroundColor: Colors.orange,
           ),
-
         );
-
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BalancePage())).then((_) => _fetchData());
       } else {
 
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: ${responseBody['message'] ?? 'Неизвестная ошибка'}'), backgroundColor: Colors.red));
@@ -528,35 +539,22 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
  
 
   String _getRequestStatusText(String? status) {
-
     switch (status?.toLowerCase()) {
-
       case 'pending':
-
         return 'На рассмотрении';
-
       case 'active':
-
         return 'Актив';
-
-      case 'in_transit':
-
-        return 'В пути';
-
-      case 'closed':
-
-        return 'Закрыт';
-
       case 'awaiting_confirmation':
-
-        return 'Ожидает подтверждения';
-
+        return 'Ожидает рассмотрения';
+      case 'awaiting':
+        return 'Ожидание';
+      case 'in_transit':
+        return 'В пути';
+      case 'closed':
+        return 'Закрыт';
       default:
-
         return 'Неизвестно';
-
     }
-
   }
 
 
@@ -677,9 +675,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
                   _buildDetailRow('Статус заявки', _getRequestStatusText(r.status)),
 
-                  // Отображаем телефоны только когда статус in_transit
-
-                  if (r.status == 'in_transit') ...[
+                  // Телефоны при статусе awaiting (принят) или in_transit (в пути)
+                  if (r.status == 'in_transit' || r.status == 'awaiting') ...[
 
                     const Divider(color: Colors.white24, height: 24),
 
@@ -766,29 +763,37 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
             if (r.originStops.isNotEmpty || r.destinationStops.isNotEmpty)
 
               Padding(
-
                 padding: const EdgeInsets.only(top: 16.0),
-
-                child: Center(
-
-                  child: TextButton.icon(
-
-                    icon: const Icon(Icons.map_outlined, color: Color(0xFFdcd232)),
-
-                    label: const Text('Посмотреть на карте', style: TextStyle(color: Color(0xFFdcd232), fontWeight: FontWeight.bold)),
-
-                    onPressed: () {
-
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => RouteMapPage(originStops: r.originStops, destStops: r.destinationStops))).then((_) => _fetchData());
-
-                    },
-
-                  ),
-
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isClient && r.status != 'in_transit')
+                      TextButton.icon(
+                        icon: const Icon(Icons.map_outlined, color: Color(0xFFdcd232)),
+                        label: const Text('Посмотреть на карте', style: TextStyle(color: Color(0xFFdcd232), fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => RouteMapPage(originStops: r.originStops, destStops: r.destinationStops))).then((_) => _fetchData());
+                        },
+                      ),
+                    if (isClient && r.status == 'in_transit')
+                      TextButton.icon(
+                        icon: const Icon(Icons.local_shipping, color: Color(0xFFdcd232)),
+                        label: const Text('Где водитель?', style: TextStyle(color: Color(0xFFdcd232), fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => DriverTrackingPage(request: r))).then((_) => _fetchData());
+                        },
+                      ),
+                    if (isDriver && (r.status == 'in_transit' || r.status == 'active' || r.status == 'awaiting'))
+                      TextButton.icon(
+                        icon: const Icon(Icons.local_shipping, color: Color(0xFFdcd232)),
+                        label: const Text('Моя позиция', style: TextStyle(color: Color(0xFFdcd232), fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => DriverRouteMapPage(request: r)));
+                        },
+                      ),
+                  ],
                 ),
-
               ),
-
             if (isDriver && _myBidStatus == null)
 
               Container(

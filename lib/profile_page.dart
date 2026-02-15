@@ -12,6 +12,7 @@ import 'models/city_model.dart'; // Убедитесь, что этот файл
 import 'constants/api_constants.dart';
 import 'my_reviews_page.dart';
 import 'notifications_history_page.dart';
+import 'about_us_page.dart';
 import 'services/push_notification_service.dart';
 
 // =======================================================================
@@ -268,6 +269,20 @@ class _ProfilePageState extends State<ProfilePage> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const NotificationsHistoryPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            _buildMenuItem(
+              icon: Icons.info_outline,
+              text: 'О нас',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AboutUsPage(),
                   ),
                 );
               },

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'otp_screen.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'main_screen.dart';
 import 'constants/api_constants.dart';
+import 'services/push_notification_service.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -16,21 +20,54 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController(text: '992');
-  String? _selectedRole;
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String _countryCode = '992';
+  String _selectedRole = 'client';
   bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  static const List<Map<String, String>> countries = [
+    {'code': '992', 'label': 'Таджикистан +992'},
+    {'code': '998', 'label': 'Узбекистан +998'},
+    {'code': '7', 'label': 'Казахстан/Россия +7'},
+    {'code': '93', 'label': 'Афганистан +93'},
+    {'code': '86', 'label': 'Китай +86'},
+  ];
 
   late TabController _tabController;
+
+  int get _phoneLength {
+    switch (_countryCode) {
+      case '992':
+      case '998':
+      case '93':
+        return 9;
+      case '7':
+        return 10;
+      case '86':
+        return 11;
+      default:
+        return 9;
+    }
+  }
+
+  String get _fullPhone {
+    final n = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    return _countryCode + n;
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _passwordController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -43,117 +80,93 @@ class _AuthScreenState extends State<AuthScreen>
     }
   }
 
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  static const String _whatsappSupportPhone = '992777000570';
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    final phone = _phoneController.text;
-    final isLogin = _tabController.index == 0;
-
+  Future<void> _openForgotPasswordWhatsApp() async {
+    final fullPhone = _fullPhone;
+    final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    final text = phoneDigits.isEmpty
+        ? 'Ассалому алайкум! Пароли рақами телефон лозим аст.'
+        : 'Ассалому алайкум! Номери ман: +$fullPhone. Пароли ин номери +$fullPhone. лозим аст.';
+    final uri = Uri.parse(
+      'https://wa.me/$_whatsappSupportPhone?text=${Uri.encodeComponent(text)}',
+    );
     try {
-      final checkUrl = ApiConstants.getUri('api/check_phone/');
-      final checkResponse = await http.post(
-        checkUrl,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'phone': phone}),
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw TimeoutException('Запрос превысил время ожидания. Проверьте подключение к интернету.');
-        },
-      );
-
-      if (checkResponse.statusCode != 200) {
-        _showErrorSnackBar('Ошибка проверки номера. Попробуйте снова.');
-        return;
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        _showErrorSnackBar('WhatsApp кушода нашуд.');
       }
-
-      final bool phoneExists = json.decode(checkResponse.body)['exists'];
-
-      // ... дар дохили _submitForm дар auth_screen.dart ...
-      if (isLogin) {
-        if (!phoneExists) {
-          _showErrorSnackBar(
-              'Этот номер не зарегистрирован. Пожалуйста, зарегистрируйтесь.');
-          _tabController.animateTo(1);
-          return;
-        }
-      } else {
-        // Ин қисми РЕГИСТРАЦИЯ аст
-        if (phoneExists) {
-          // ✅ ПАЁМИ ДУРУСТ
-          _showErrorSnackBar(
-              'Этот номер уже зарегистрирован. Пожалуйста, войдите.');
-          _tabController.animateTo(0); // Ба саҳифаи "Вход" гузарондан
-          return;
-        }
-      }
-//...
-      await _sendOtp(phone);
-    } on TimeoutException catch (e) {
-      _showErrorSnackBar(e.message ?? 'Превышено время ожидания. Проверьте подключение к интернету.');
-    } on http.ClientException catch (e) {
-      _showErrorSnackBar('Ошибка подключения: ${e.message}. Проверьте подключение к интернету.');
-    } catch (error) {
-      _showErrorSnackBar('Ошибка подключения: ${error.toString()}. Проверьте подключение к интернету.');
-    } finally {
+    } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        _showErrorSnackBar('WhatsApp кушода нашуд. Интернети ё барномаро санҷед.');
       }
     }
   }
 
-  Future<void> _sendOtp(String phone) async {
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final phone = _fullPhone;
+    final password = _passwordController.text;
+    final isLogin = _tabController.index == 0;
+
     try {
-      final url = ApiConstants.getUri('send_otp/');
-      // Увеличиваем таймаут до 90 секунд для избежания ошибок при медленном API
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'phone': phone}),
-      ).timeout(
-        const Duration(seconds: 90),
-        onTimeout: () {
-          throw TimeoutException('Запрос превысил время ожидания. Попробуйте снова.');
-        },
+      final url = Uri.parse(
+        ApiConstants.getUrl(isLogin ? 'api/auth/login/' : 'api/auth/register/'),
       );
+      final body = <String, dynamic>{
+        'phone': phone,
+        'password': password,
+      };
+      if (!isLogin) body['role'] = _selectedRole;
 
-      final responseData = json.decode(response.body);
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(body),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () =>
+                throw TimeoutException('Вакти интизорӣ гузашт. Иттисоро санҷед.'),
+          );
 
-      if (response.statusCode == 200 && responseData['success'] == true) {
-        final role = _tabController.index == 1 ? _selectedRole : null;
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', data['access']);
+        await prefs.setString('role', data['role'] ?? 'client');
+        if (data['refresh'] != null) {
+          await prefs.setString('refresh_token', data['refresh']);
+        }
         if (mounted) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => OtpScreen(phoneNumber: phone, role: role),
-            ),
+          try {
+            if (!kIsWeb) {
+              await PushNotificationService.initPushNotifications(context);
+            }
+          } catch (e) {
+            print('⚠️ Push инициализация: $e');
+          }
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+            (route) => false,
           );
         }
       } else {
-        if (mounted) {
-          _showErrorSnackBar(
-              responseData['message'] ?? 'Ошибка отправки СМС. Попробуйте снова.');
-        }
+        _showErrorSnackBar(data['message'] ?? 'Хатогӣ. Аз нав санҷед.');
       }
     } on TimeoutException catch (e) {
-      if (mounted) {
-        _showErrorSnackBar(e.message ?? 'Превышено время ожидания. Попробуйте снова.');
-      }
+      _showErrorSnackBar(e.message ?? 'Вакти интизорӣ гузашт.');
     } on http.ClientException catch (e) {
-      if (mounted) {
-        _showErrorSnackBar('Ошибка подключения: ${e.message}. Проверьте интернет.');
-      }
-    } catch (error) {
-      if (mounted) {
-        _showErrorSnackBar('Ошибка отправки СМС: ${error.toString()}');
-      }
+      _showErrorSnackBar('Иттисор: ${e.message}');
+    } catch (e) {
+      _showErrorSnackBar('Хатогӣ: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -163,57 +176,201 @@ class _AuthScreenState extends State<AuthScreen>
       backgroundColor: const Color(0xFF212121),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: SingleChildScrollView(
             child: Column(
               children: [
-                const SizedBox(height: 50),
-                Image.asset('assets/images/logo1.png', width: 100),
-                const SizedBox(height: 20),
+                const SizedBox(height: 36),
+                Image.asset('assets/images/logo1.png', width: 80),
+                const SizedBox(height: 14),
                 const Text('Добро пожаловать!',
                     style: TextStyle(
                         color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(height: 30),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 22),
                 Container(
-                  height: 45,
+                  height: 40,
                   decoration: BoxDecoration(
                       color: Colors.black26,
-                      borderRadius: BorderRadius.circular(25.0)),
+                      borderRadius: BorderRadius.circular(20.0)),
                   child: TabBar(
                     controller: _tabController,
                     labelPadding: const EdgeInsets.symmetric(horizontal: 0.0),
                     indicator: BoxDecoration(
                         color: const Color(0xFFdcd232),
-                        borderRadius: BorderRadius.circular(25.0)),
+                        borderRadius: BorderRadius.circular(20.0)),
                     labelColor: Colors.black,
+                    labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     unselectedLabelColor: Colors.white,
+                    unselectedLabelStyle: const TextStyle(fontSize: 14),
                     tabs: const [
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.0),
+                        padding: EdgeInsets.symmetric(horizontal: 16.0),
                         child: Tab(text: 'Вход'),
                       ),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.0),
+                        padding: EdgeInsets.symmetric(horizontal: 16.0),
                         child: Tab(text: 'Регистрация'),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 300,
-                  child: Form(
-                    key: _formKey,
-                    child: TabBarView(
-                      controller: _tabController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        _buildAuthForm(isLogin: true),
-                        _buildAuthForm(isLogin: false)
+                const SizedBox(height: 18),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80,
+                            height: 52,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.black26,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.white38, width: 1),
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _countryCode,
+                                isExpanded: true,
+                                dropdownColor: const Color(0xFF333333),
+                                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white54, size: 22),
+                                items: countries
+                                    .map((c) => DropdownMenuItem(
+                                          value: c['code'],
+                                          child: Text(c['label']!, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) setState(() => _countryCode = v);
+                                },
+                                selectedItemBuilder: (context) => countries
+                                    .map((c) => Center(child: Text('+${c['code']}', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500))))
+                                    .toList(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: SizedBox(
+                              height: 52,
+                              child: TextFormField(
+                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                style: const TextStyle(color: Colors.white, fontSize: 15),
+                                decoration: _buildInputDecoration('Номер телефона').copyWith(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(_phoneLength),
+                                ],
+                                validator: (value) {
+                                  final n = (value ?? '').replaceAll(RegExp(r'\D'), '');
+                                  if (n.length != _phoneLength) {
+                                    return 'Номер должен содержать $_phoneLength цифр';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: _buildInputDecoration('Пароль (от 8 букв/цифр)').copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              color: Colors.white54,
+                              size: 20,
+                            ),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(32),
+                          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Введите пароль';
+                          }
+                          if (value.length < 8) {
+                            return 'Пароль не менее 8 символов (буквы и цифры)';
+                          }
+                          if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
+                            return 'Только буквы и цифры';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (_tabController.index == 0) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _openForgotPasswordWhatsApp,
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFFdcd232),
+                              padding: const EdgeInsets.symmetric(horizontal: 0),
+                            ),
+                            child: const Text('Забыл пароль?', style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
                       ],
-                    ),
+                      const SizedBox(height: 12),
+                      if (_tabController.index == 1)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedRole,
+                            dropdownColor: const Color(0xFF333333),
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            decoration: _buildInputDecoration('Роль (клиент/водитель)'),
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white54, size: 20),
+                            items: const [
+                              DropdownMenuItem(value: 'client', child: Text('Клиент')),
+                              DropdownMenuItem(value: 'driver', child: Text('Водитель')),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) setState(() => _selectedRole = v);
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _submitForm,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFdcd232),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.black, strokeWidth: 2)
+                              : Text(
+                                  _tabController.index == 0 ? 'Войти' : 'Зарегистрироваться',
+                                  style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -224,96 +381,24 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
-  Widget _buildAuthForm({required bool isLogin}) {
-    return Column(
-      children: [
-        const SizedBox(height: 20),
-        TextFormField(
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-          style: const TextStyle(color: Colors.white),
-          decoration: _buildInputDecoration('Номер телефон'),
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(12)
-          ],
-          validator: (value) {
-            if (value == null || !value.startsWith('992')) {
-              return 'Номер должен начинаться с 992';
-            }
-            if (value.length != 12) {
-              return 'Введите полный 9-значный номер после кода страны';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 20),
-        if (!isLogin)
-          DropdownButtonFormField<String>(
-            initialValue: _selectedRole,
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedRole = newValue;
-              });
-            },
-            dropdownColor: const Color(0xFF333333),
-            style:
-                const TextStyle(color: Colors.white, fontFamily: 'Montserrat'),
-            decoration: _buildInputDecoration('Выбрать роль...'),
-            icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
-            items: const [
-              DropdownMenuItem(value: 'client', child: Text('Клиент')),
-              DropdownMenuItem(value: 'driver', child: Text('Водитель')),
-            ],
-            validator: (value) {
-              // Тағйирот: Валидатсия танҳо барои бахши Регистрация
-              if (_tabController.index == 1 && value == null) {
-                return 'Пожалуйста, выберите роль';
-              }
-              return null;
-            },
-          ),
-        const SizedBox(height: 30),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _submitForm,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFdcd232),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: _isLoading
-                ? const CircularProgressIndicator(color: Colors.black)
-                : Text(isLogin ? 'Войти по смс' : 'Отправить смс',
-                    style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold)),
-          ),
-        ),
-      ],
-    );
-  }
-
   InputDecoration _buildInputDecoration(String? label) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white54),
-      errorStyle: const TextStyle(color: Colors.redAccent),
+      labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 12),
       enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Colors.white54),
-          borderRadius: BorderRadius.circular(12)),
+          borderSide: const BorderSide(color: Colors.white38),
+          borderRadius: BorderRadius.circular(10)),
       focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Color(0xFFdcd232)),
-          borderRadius: BorderRadius.circular(12)),
+          borderSide: const BorderSide(color: Color(0xFFdcd232), width: 1.5),
+          borderRadius: BorderRadius.circular(10)),
       errorBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: Colors.redAccent),
-          borderRadius: BorderRadius.circular(12)),
+          borderRadius: BorderRadius.circular(10)),
       focusedErrorBorder: OutlineInputBorder(
           borderSide: const BorderSide(color: Colors.redAccent, width: 2),
-          borderRadius: BorderRadius.circular(12)),
+          borderRadius: BorderRadius.circular(10)),
     );
   }
 }
