@@ -44,8 +44,8 @@ val localProps = localProperties()
 // Боварӣ ҳосил кунед, ки version code ва version name дуруст муайян шудаанд
 // Поёнӣ як арзиши пешфарзро таъмин мекунад; Play Console ба шумо талаб мекунад версияҳои навро яхд карда
 // барои интишор — инро ба 5 бадахшам (requested by Play Console).
-val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "9").toString()
-val flutterVersionName = (project.findProperty("flutter.versionName") ?: "1.0.1").toString()
+val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "16").toString()
+val flutterVersionName = (project.findProperty("flutter.versionName") ?: "10.10.10").toString()
 
 android {
     namespace = "com.payvandtrans.app"
