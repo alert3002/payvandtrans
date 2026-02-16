@@ -1,5 +1,6 @@
 // Файли route_map_page.dart (Версияи нав бо нишон додани роҳ)
 
+import 'dart:ui' show StrokeCap, StrokeJoin;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -152,7 +153,7 @@ class _RouteMapPageState extends State<RouteMapPage> {
             '${point.longitude},${point.latitude}') // <-- САТРИ ИСЛОҲШУДА
         .join(';');
     final url =
-        'https://router.project-osrm.org/route/v1/driving/$waypoints?geometries=polyline';
+        'https://router.project-osrm.org/route/v1/driving/$waypoints?geometries=polyline&overview=full';
 
     try {
       final response = await http.get(Uri.parse(url));
@@ -207,6 +208,8 @@ class _RouteMapPageState extends State<RouteMapPage> {
                 points: _routePoints,
                 color: Colors.lightBlue,
                 strokeWidth: 5,
+                strokeCap: StrokeCap.round,
+                strokeJoin: StrokeJoin.round,
               ),
             ],
           ),

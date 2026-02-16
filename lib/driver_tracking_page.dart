@@ -1,6 +1,7 @@
 // Саҳифа барои клиент — нишон додани ҷойгиршавии шофер (мошин) дар карта
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show StrokeCap, StrokeJoin;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' show LatLng, Distance, LengthUnit;
@@ -215,7 +216,7 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
         .join(';');
     try {
       final response = await http.get(Uri.parse(
-          'https://router.project-osrm.org/route/v1/driving/$waypoints?geometries=polyline'));
+          'https://router.project-osrm.org/route/v1/driving/$waypoints?geometries=polyline&overview=full'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
@@ -402,6 +403,8 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                       points: _routePoints,
                       color: Colors.lightBlue,
                       strokeWidth: 5,
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
                     ),
                   ],
                 ),
@@ -425,28 +428,38 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                 ),
               ),
             ),
-          if (r.driverPhone != null && r.driverPhone!.isNotEmpty)
-            Positioned(
-              bottom: 24,
-              left: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2a2a2e).withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+          Positioned(
+            bottom: 24,
+            left: 16,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF2a2a2e).withOpacity(0.98),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                    child: _buildStatusRow(r.status),
+                  ),
+                  if (r.driverPhone != null && r.driverPhone!.isNotEmpty) ...[
+                    const Divider(height: 1, color: Colors.white12),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                     if (_hasDriverLocation) ...[
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -494,11 +507,46 @@ class _DriverTrackingPageState extends State<DriverTrackingPage> {
                       ],
                     ),
                   ],
-                ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
+          ),
         ],
       ),
+    );
+  }
+
+  static const _brandYellow = Color(0xFFdcd232);
+
+  Widget _buildStatusRow(String? status) {
+    final isAwaiting = status == 'awaiting' || status == 'active' || status == 'awaiting_confirmation';
+    final isInTransit = status == 'in_transit';
+    final isClosed = status == 'closed';
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _statusChip('Ожидание', isAwaiting),
+        const SizedBox(width: 8),
+        _statusChip('В пути', isInTransit),
+        const SizedBox(width: 8),
+        _statusChip('Закрыт', isClosed),
+      ],
+    );
+  }
+
+  Widget _statusChip(String label, bool isActive) {
+    final bg = isActive ? _brandYellow : const Color(0xFF3a3a3e);
+    final fg = isActive ? Colors.black : Colors.white;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(label, style: TextStyle(color: fg, fontSize: 14, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
     );
   }
 

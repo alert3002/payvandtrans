@@ -1,6 +1,7 @@
 // Карта барои водитель — маршрут + мавқеи ҷории худ (мошин)
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show StrokeCap, StrokeJoin;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -36,10 +37,16 @@ class _DriverRouteMapPageState extends State<DriverRouteMapPage> {
   double? _distanceRemainingKm;
   int? _etaMinutes;
   String _currentPlace = '—';
+  int? _orderId;
+  String? _driverStatus;
+  bool _canManualStartTrip = false;
+  bool _canManualClose = false;
+  bool _actionLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _driverStatus = widget.request.status;
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _setupMap();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -190,7 +197,7 @@ class _DriverRouteMapPageState extends State<DriverRouteMapPage> {
         .join(';');
     try {
       final resp = await http.get(Uri.parse(
-          'https://router.project-osrm.org/route/v1/driving/$waypoints?geometries=polyline'));
+          'https://router.project-osrm.org/route/v1/driving/$waypoints?geometries=polyline&overview=full'));
       if (resp.statusCode == 200) {
         final data = json.decode(resp.body);
         if (data['routes'] != null && (data['routes'] as List).isNotEmpty) {
@@ -280,12 +287,94 @@ class _DriverRouteMapPageState extends State<DriverRouteMapPage> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       if (token == null) return;
-      await http.post(
+      final resp = await http.post(
         ApiConstants.getUri('api/requests/${widget.request.id}/update_location/'),
         headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'},
         body: json.encode({'lat': _myPosition!.latitude, 'lng': _myPosition!.longitude}),
       );
+      if (resp.statusCode == 200 && mounted) {
+        final data = json.decode(resp.body) as Map<String, dynamic>?;
+        if (data != null && data['success'] == true) {
+          setState(() {
+            _orderId = data['order_id'] as int?;
+            _driverStatus = data['status'] as String?;
+            _canManualStartTrip = data['can_manual_start_trip'] == true;
+            _canManualClose = data['can_manual_close'] == true;
+          });
+        }
+      }
     } catch (_) {}
+  }
+
+  Future<void> _tapStartTrip() async {
+    if (_orderId == null || _actionLoading) return;
+    setState(() => _actionLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token == null) return;
+      final resp = await http.post(
+        ApiConstants.getUri('api/orders/$_orderId/start_trip/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (mounted) {
+        final data = resp.statusCode == 200 ? json.decode(resp.body) as Map<String, dynamic>? : null;
+        if (data != null && data['success'] == true) {
+          setState(() {
+            _driverStatus = 'in_transit';
+            _canManualStartTrip = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Поездка началась'), backgroundColor: Color(0xFF2a2a2e)),
+          );
+        } else {
+          final msg = data?['message']?.toString() ?? 'Не удалось начать поездку';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.orange));
+        }
+      }
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка сети'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _actionLoading = false);
+    }
+  }
+
+  Future<void> _tapCloseOrder() async {
+    if (_orderId == null || _actionLoading) return;
+    setState(() => _actionLoading = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      if (token == null) return;
+      final resp = await http.post(
+        ApiConstants.getUri('api/orders/$_orderId/close/'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (mounted) {
+        final data = resp.statusCode == 200 ? json.decode(resp.body) as Map<String, dynamic>? : null;
+        if (data != null && data['success'] == true) {
+          setState(() {
+            _driverStatus = 'closed';
+            _canManualClose = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Заказ закрыт'), backgroundColor: Color(0xFF2a2a2e)),
+          );
+          Navigator.of(context).pop(true);
+        } else {
+          final msg = data?['message']?.toString() ?? 'Не удалось закрыть заказ';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.orange));
+        }
+      }
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка сети'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _actionLoading = false);
+    }
   }
 
   Widget _buildInfoItem(IconData icon, String text) {
@@ -296,6 +385,25 @@ class _DriverRouteMapPageState extends State<DriverRouteMapPage> {
         const SizedBox(width: 4),
         Text(text, style: const TextStyle(color: Colors.white, fontSize: 13)),
       ],
+    );
+  }
+
+  static const _brandYellow = Color(0xFFdcd232);
+
+  Widget _buildStatusBtn(String label, bool isActive, bool enabled, VoidCallback? onPressed) {
+    final bg = isActive ? _brandYellow : (enabled ? Colors.grey.shade700 : Colors.black);
+    final fg = isActive ? Colors.black : Colors.white70;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: enabled ? onPressed : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Text(label, style: TextStyle(color: fg, fontSize: 14, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
+        ),
+      ),
     );
   }
 
@@ -376,7 +484,13 @@ class _DriverRouteMapPageState extends State<DriverRouteMapPage> {
               if (_routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
-                    Polyline(points: _routePoints, color: Colors.lightBlue, strokeWidth: 5),
+                    Polyline(
+                      points: _routePoints,
+                      color: Colors.lightBlue,
+                      strokeWidth: 5,
+                      strokeCap: StrokeCap.round,
+                      strokeJoin: StrokeJoin.round,
+                    ),
                   ],
                 ),
               MarkerLayer(markers: _markers),
@@ -458,10 +572,26 @@ class _DriverRouteMapPageState extends State<DriverRouteMapPage> {
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'Держите экран включённым — клиент видит вашу позицию на карте.',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildStatusBtn('Ожидание', _driverStatus == 'awaiting' || _driverStatus == 'active' || _driverStatus == 'awaiting_confirmation', false, null),
+                      const SizedBox(width: 8),
+                      _buildStatusBtn('В пути', _driverStatus == 'in_transit', _canManualStartTrip && !_actionLoading, _tapStartTrip),
+                      const SizedBox(width: 8),
+                      _buildStatusBtn('Закрыт', _driverStatus == 'closed', _canManualClose && !_actionLoading, _tapCloseOrder),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Держите экран включённым — клиент видит вашу позицию на карте.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ),

@@ -775,7 +775,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                           Navigator.push(context, MaterialPageRoute(builder: (context) => RouteMapPage(originStops: r.originStops, destStops: r.destinationStops))).then((_) => _fetchData());
                         },
                       ),
-                    if (isClient && r.status == 'in_transit')
+                    if (isClient && (r.status == 'in_transit' || r.status == 'active' || r.status == 'awaiting' || r.status == 'awaiting_confirmation'))
                       TextButton.icon(
                         icon: const Icon(Icons.local_shipping, color: Color(0xFFdcd232)),
                         label: const Text('Где водитель?', style: TextStyle(color: Color(0xFFdcd232), fontWeight: FontWeight.bold)),
