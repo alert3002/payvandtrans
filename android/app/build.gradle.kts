@@ -44,7 +44,7 @@ val localProps = localProperties()
 // Боварӣ ҳосил кунед, ки version code ва version name дуруст муайян шудаанд
 // Поёнӣ як арзиши пешфарзро таъмин мекунад; Play Console ба шумо талаб мекунад версияҳои навро яхд карда
 // барои интишор — инро ба 5 бадахшам (requested by Play Console).
-val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "18").toString()
+val flutterVersionCode = (project.findProperty("flutter.versionCode") ?: "19").toString()
 val flutterVersionName = (project.findProperty("flutter.versionName") ?: "10.10.10").toString()
 
 android {
